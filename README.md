@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AOJ Punjab — Membership Portal
 
-## Getting Started
+Online membership portal for the **Association of Junior Engineers, Punjab (PSPCL/PSTCL) (Regd.)**,
+Licence No. PB41/253/351836, "Engineers' Square" 20E/5, Tripuri Town, Patiala.
 
-First, run the development server:
+A Junior Engineer opens the registration link, fills the membership form (same fields as the paper form) with a
+passport-size photo, and receives a membership number, login ID and password once the Operation Team approves.
+**No online payment**: the subscription is deducted from salary, as stated in the form's declaration.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Objectives
+
+- Replace paper and WhatsApp onboarding with one secure web flow.
+- Give the Operation Team one dashboard to review, approve or reject applications.
+- Issue login credentials automatically after approval.
+- Give the Admin full control over members, staff and reports.
+
+## Roles
+
+| Role | Sees |
+| --- | --- |
+| **Admin** | Everything: members, staff accounts, applications, reports |
+| **Operation Team** | Application queue: review, approve or reject |
+| **Member** | Own profile and membership status |
+
+## Stack
+
+| Layer | Choice | Why |
+| --- | --- | --- |
+| Framework | Next.js 16 (App Router) + React 19 + TypeScript | UI and backend in one app, with Server Actions (no separate API layer) |
+| Styling | Tailwind CSS v4 + Archivo font | Design tokens live in `globals.css` (dark theme, lime accent) |
+| Icons | Phosphor Icons (`@phosphor-icons/react`) | Consistent free icon set; no photos used |
+| Database | Neon Postgres (serverless) | Managed Postgres with branching and a free tier |
+| ORM | Drizzle ORM + drizzle-kit | Typed SQL and migrations, no runtime overhead |
+| Validation | Zod | One schema validates every form on the server |
+| Auth | bcryptjs + signed JWT cookie (jose) | Staff-issued credentials only, so no OAuth needed |
+| Hosting | Vercel (recommended) | Built for Next.js; Neon has a native integration |
+
+## Structure
+
+```
+src/
+  app/
+    page.tsx                 Landing page (Register Now / Login)
+    register/
+      page.tsx               Membership form page
+      register-form.tsx      Form UI (client)
+      actions.ts             Validation + insert (server)
+    login/                   Login page + login/logout actions
+    dashboard/page.tsx       Role-aware dashboard (protected)
+  components/site-header.tsx Logo + header
+  db/
+    schema.ts                applications, users tables
+    index.ts                 Neon + Drizzle client
+  lib/session.ts             JWT session cookie
+scripts/create-user.mjs      Create admin / operations accounts
+drizzle.config.ts
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+cp .env.example .env          # paste your Neon pooled connection string + a SESSION_SECRET
+npm run db:push               # create tables in Neon
+npm run user:create -- admin 'StrongPass#1' admin   # first admin; add more staff from the Staff page
+npm run dev                   # http://localhost:3000
+npm run check                 # self-checks for password/CSV helpers
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Dashboards (`/dashboard`)
 
-## Learn More
+| Page | Admin | Operation Team | Member |
+| --- | --- | --- | --- |
+| Overview: stats, review queue, members by zone | ✓ | ✓ | Membership card + details |
+| Applications: tabs, search, approve / reject | ✓ | ✓ | |
+| Members: list, search, CSV export | ✓ | | |
+| Staff: create accounts, reset passwords, turn on/off | ✓ | | |
+| Account: change own password | ✓ | ✓ | ✓ |
+| Membership card PDF | Any member | Any member | Own card |
 
-To learn more about Next.js, take a look at the following resources:
+Approving an application issues `AOJ-0001`-style membership numbers and a member login (`aoj0001`) with a
+generated password, shown once to the reviewer to share. Photos are served only to staff and the member.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Membership card (PDF)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`/api/card/<applicationId>` returns an A4 PDF with the card at real ID-card size (85.6 x 54 mm): front and back side
+by side with crop marks and a fold line. Print at 100%, cut, fold, laminate. Generated by `src/lib/card-pdf.ts`
+(pdf-lib). Photos are converted to JPEG in the browser at upload, so any phone photo works and embeds cleanly.
 
-## Deploy on Vercel
+## Email and SMS notifications
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| When | Email | SMS |
+| --- | --- | --- |
+| Application submitted | Confirmation with reference no. | Confirmation with reference no. |
+| Approved | Membership no., login ID, password, login button | Membership no., login ID, password |
+| Rejected | Full reason | Short reason (DLT limit: 30 characters per variable) |
+| Admin resets a member's password | New password | New password |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Configure in `.env` (see `.env.example`). If a channel is not configured it is skipped, never an error.
+- Every attempt is logged in the `notifications` table and shown on the application page under **Messages to applicant**.
+- Message content lives in `src/lib/messages.ts`; sending in `src/lib/notify.ts`.
+
+### SMS templates (register on DLT, then in MSG91)
+
+Indian law (TRAI DLT) requires every business SMS text to be pre-approved. Register your sender ID and these
+four templates on your DLT portal, add them in MSG91 with the same variable names, and put each template ID in `.env`:
+
+| `.env` key | Template text |
+| --- | --- |
+| `MSG91_TEMPLATE_RECEIVED` | `Dear ##name##, your AOJ Punjab membership application is received. Ref: ##ref##. You will get your login details after approval. - AOJ Punjab` |
+| `MSG91_TEMPLATE_APPROVED` | `Dear ##name##, your AOJ Punjab membership ##number## is approved. Login ID: ##login## Password: ##password## Please change your password after login. - AOJ Punjab` |
+| `MSG91_TEMPLATE_REJECTED` | `Dear ##name##, your AOJ Punjab membership application (Ref: ##ref##) was not approved. Reason: ##reason##. Details sent to your email. - AOJ Punjab` |
+| `MSG91_TEMPLATE_PASSWORD` | `Dear ##name##, your AOJ Punjab password has been reset. Login ID: ##login## New password: ##password## - AOJ Punjab` |
+
+## Roadmap
+
+- [x] **Phase 1**: landing page, membership form with photo, DB schema, login and sessions
+- [x] **Phase 2**: Operation Team review queue, Admin panel, member dashboard, CSV export
+- [x] **Phase 3**: email/SMS notifications with delivery log
+- [x] **Phase 4**: printable membership card PDF
+- [ ] **Next**: login rate limiting, card verification QR code
