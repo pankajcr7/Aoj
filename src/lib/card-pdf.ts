@@ -1,7 +1,10 @@
 // Membership card PDF: CR80 card (85.6 x 54 mm), front + back side by side on A4 for print, cut, fold, laminate.
 import {
+  appendBezierCurve,
   clip,
+  closePath,
   endPath,
+  moveTo,
   PDFDocument,
   popGraphicsState,
   pushGraphicsState,
@@ -26,6 +29,9 @@ export type CardData = {
   contact: string;
   photo: Uint8Array;
   photoType: string;
+  signature?: Uint8Array | null;
+  signatureType?: string | null;
+  logo: Uint8Array; // JPEG
 };
 
 const mm = (v: number) => (v * 72) / 25.4;
@@ -61,16 +67,34 @@ function text(page: PDFPage, s: string, x: number, y: number, font: PDFFont, siz
   page.drawText(f.t, { x, y, size: f.size, font, color });
 }
 
-const BOLT = "M13.5 2 4 13.5h6.5L9 22l10-12h-6.6L13.5 2Z"; // 24x24 lightning mark
+/** Draws `img` cropped to a circle of radius r centred on (cx, cy). */
+function circleImage(page: PDFPage, img: PDFImage, cx: number, cy: number, r: number) {
+  const k = r * 0.5523; // bezier handle length for a quarter circle
+  page.pushOperators(
+    pushGraphicsState(),
+    moveTo(cx + r, cy),
+    appendBezierCurve(cx + r, cy + k, cx + k, cy + r, cx, cy + r),
+    appendBezierCurve(cx - k, cy + r, cx - r, cy + k, cx - r, cy),
+    appendBezierCurve(cx - r, cy - k, cx - k, cy - r, cx, cy - r),
+    appendBezierCurve(cx + k, cy - r, cx + r, cy - k, cx + r, cy),
+    closePath(),
+    clip(),
+    endPath(),
+  );
+  page.drawImage(img, { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r });
+  page.pushOperators(popGraphicsState());
+}
 
-function front(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFFont; reg: PDFFont }, photo: PDFImage) {
+type Images = { photo: PDFImage; logo: PDFImage; signature?: PDFImage };
+
+function front(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFFont; reg: PDFFont }, { photo, logo }: Images) {
   page.drawRectangle({ x, y, width: W, height: H, color: WHITE });
   // Header band
   const hh = mm(10.5);
   page.drawRectangle({ x, y: y + H - hh, width: W, height: hh, color: DARK });
-  page.drawSvgPath(BOLT, { x: x + mm(2.4), y: y + H - mm(1.9), scale: 0.55, color: LIME });
-  text(page, "ASSOCIATION OF JUNIOR ENGINEERS, PUNJAB", x + mm(9.6), y + H - mm(4.6), f.bold, 7, WHITE, W - mm(12));
-  text(page, "(PSPCL/PSTCL) Regd.   Licence No. PB41/253/351836", x + mm(9.6), y + H - mm(8.2), f.reg, 5, LIME, W - mm(12));
+  circleImage(page, logo, x + mm(5.5), y + H - hh / 2, mm(4.4));
+  text(page, "ASSOCIATION OF JUNIOR ENGINEERS, PUNJAB", x + mm(11), y + H - mm(4.6), f.bold, 7, WHITE, W - mm(13.5));
+  text(page, "(PSPCL/PSTCL) Regd.   Licence No. PB41/253/351836", x + mm(11), y + H - mm(8.2), f.reg, 5, LIME, W - mm(13.5));
 
   // Photo: fill a 3:4 box, cropping the overflow (like a passport photo)
   const pw = mm(19), ph = mm(25), px = x + mm(3.5), py = y + mm(7.5);
@@ -100,7 +124,7 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFF
   page.drawText(since, { x: x + W - mm(3.5) - f.reg.widthOfTextAtSize(since, 5.5), y: y + mm(1.7), size: 5.5, font: f.reg, color: DARK });
 }
 
-function back(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFFont; reg: PDFFont }) {
+function back(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFFont; reg: PDFFont }, { signature }: Images) {
   page.drawRectangle({ x, y, width: W, height: H, color: WHITE });
   page.drawRectangle({ x, y: y + H - mm(1.6), width: W, height: mm(1.6), color: LIME });
 
@@ -120,6 +144,10 @@ function back(page: PDFPage, x: number, y: number, d: CardData, f: { bold: PDFFo
   const sy = y + mm(14);
   page.drawLine({ start: { x: lx, y: sy }, end: { x: lx + mm(30), y: sy }, thickness: 0.4, color: MUTED });
   page.drawLine({ start: { x: x + W - mm(34), y: sy }, end: { x: x + W - mm(4), y: sy }, thickness: 0.4, color: MUTED });
+  if (signature) {
+    const sw = mm(30), sh = mm(7), sc = Math.min(sw / signature.width, sh / signature.height);
+    page.drawImage(signature, { x: lx + (sw - signature.width * sc) / 2, y: sy + mm(0.5), width: signature.width * sc, height: signature.height * sc });
+  }
   text(page, "Member's signature", lx, sy - mm(2.6), f.reg, 4.8, MUTED);
   text(page, "General Secretary, AOJ Punjab", x + W - mm(34), sy - mm(2.6), f.reg, 4.8, MUTED);
 
@@ -145,7 +173,12 @@ export async function membershipCardPdf(d: CardData): Promise<Uint8Array> {
 
   const page = pdf.addPage([595.28, 841.89]); // A4
   const f = { bold: await pdf.embedFont(StandardFonts.HelveticaBold), reg: await pdf.embedFont(StandardFonts.Helvetica) };
-  const photo = d.photoType === "image/png" ? await pdf.embedPng(d.photo) : await pdf.embedJpg(d.photo);
+  const embed = (bytes: Uint8Array, type?: string | null) => (type === "image/png" ? pdf.embedPng(bytes) : pdf.embedJpg(bytes));
+  const img: Images = {
+    photo: await embed(d.photo, d.photoType),
+    logo: await pdf.embedJpg(d.logo),
+    signature: d.signature ? await embed(d.signature, d.signatureType) : undefined,
+  };
 
   const top = page.getHeight() - mm(20);
   text(page, "AOJ Punjab Membership Card", mm(20), top, f.bold, 16);
@@ -160,8 +193,8 @@ export async function membershipCardPdf(d: CardData): Promise<Uint8Array> {
   // Front + back side by side, sharing the fold line.
   const x = (page.getWidth() - 2 * W) / 2;
   const y = top - mm(38) - H;
-  front(page, x, y, d, f, photo);
-  back(page, x + W, y, d, f);
+  front(page, x, y, d, f, img);
+  back(page, x + W, y, d, f, img);
   page.drawRectangle({ x, y, width: 2 * W, height: H, borderColor: LINE, borderWidth: 0.5 });
   page.drawLine({ start: { x: x + W, y: y - mm(6) }, end: { x: x + W, y: y + H + mm(6) }, thickness: 0.6, color: MUTED, dashArray: [3, 2] });
   text(page, "fold", x + W - mm(2.6), y + H + mm(7.5), f.reg, 6.5, MUTED);

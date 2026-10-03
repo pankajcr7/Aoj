@@ -1,98 +1,57 @@
 "use client";
 
 import {
-  ArrowLeft,
-  ArrowRight,
+  Article,
   Briefcase,
   Buildings,
   Camera,
+  CaretDown,
   Check,
   CheckCircle,
   ClipboardText,
-  EnvelopeSimple,
-  GearSix,
-  HardHat,
-  House,
   IdentificationCard,
-  Info,
-  Lightning,
+  Leaf,
   MapPin,
-  PencilSimple,
-  Phone,
-  Trash,
-  TreeStructure,
-  UploadSimple,
+  PenNib,
   User,
+  UserCircle,
+  UsersThree,
   WarningCircle,
   type Icon,
 } from "@phosphor-icons/react";
+import { Kaushan_Script } from "next/font/google";
+import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
-import { register, type RegisterState } from "./actions";
+import { useRouter } from "next/navigation";
+import { createContext, useContext, useState, useTransition } from "react";
+import { DESIGNATIONS, DISCIPLINES, HEADQUARTERS, MEMBERSHIP_TYPES, QUALIFICATIONS, ZONES } from "@/lib/form-options";
+import { updateApplication } from "@/app/dashboard/actions";
+import { register, type FormErrors } from "./actions";
 
-type Errors = NonNullable<RegisterState["errors"]>;
+const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
+
+type Errors = FormErrors;
 type Name = keyof Errors;
 type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+type Preview = { url: string; name: string };
+
+/** A saved application, shown read-only to the admin / operation team. */
+export type SavedApplication = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  hasSignature: boolean;
+  values: Record<string, string | null>; // column -> value, dates as YYYY-MM-DD
+  audit: [when: string, what: string, by: string][];
+  masterId: string; // login of the staff member viewing
+  canEdit: boolean; // Master ID (admin) may correct the details
+};
+
+// Non-null when showing a saved application: fields start with its values, read-only unless the Master ID is editing.
+const Saved = createContext<{ values: Record<string, string | null>; locked: boolean } | null>(null);
 
 const MAX_PHOTO = 500 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
-
-const STEPS: { title: string; short: string; desc: string; icon: Icon; fields: Name[] }[] = [
-  {
-    title: "Personal Details",
-    short: "Personal",
-    desc: "Tell us who you are and where you live.",
-    icon: User,
-    fields: ["name", "fatherName", "dob", "contact", "email", "address", "pinCode"],
-  },
-  {
-    title: "Service Details",
-    short: "Service",
-    desc: "Your organisation, post, joining dates and qualification.",
-    icon: Briefcase,
-    fields: ["company", "designation", "employeeId", "dojCompany", "dojCompanyAs", "dojCurrentPost", "dojCurrentPostAs", "qualification", "discipline"],
-  },
-  {
-    title: "Posting Details",
-    short: "Posting",
-    desc: "Where you are posted right now.",
-    icon: TreeStructure,
-    fields: ["zone", "circle", "division", "subDivision", "officeAddress"],
-  },
-  {
-    title: "Passport Photo",
-    short: "Photo",
-    desc: "A recent passport-size photo for your member record.",
-    icon: Camera,
-    fields: ["photo"],
-  },
-  {
-    title: "Review and Submit",
-    short: "Review",
-    desc: "Check your details, accept the declaration and submit.",
-    icon: ClipboardText,
-    fields: ["declarationAccepted"],
-  },
-];
-const LAST = STEPS.length - 1;
-
-const REVIEW: { step: number; title: string; rows: [string, string][] }[] = [
-  {
-    step: 0,
-    title: "Personal Details",
-    rows: [["Name", "name"], ["Father's Name", "fatherName"], ["Date of Birth", "dob"], ["Mobile", "contact"], ["Email", "email"], ["Pin Code", "pinCode"], ["Address", "address"]],
-  },
-  {
-    step: 1,
-    title: "Service Details",
-    rows: [["Organisation", "company"], ["Designation", "designation"], ["Employee ID", "employeeId"], ["Joined Service", "dojCompany"], ["Joined As", "dojCompanyAs"], ["Current Post Since", "dojCurrentPost"], ["Current Post", "dojCurrentPostAs"], ["Qualification", "qualification"], ["Discipline", "discipline"]],
-  },
-  {
-    step: 2,
-    title: "Posting Details",
-    rows: [["Zone", "zone"], ["Circle", "circle"], ["Division", "division"], ["Sub Division", "subDivision"], ["Office Address", "officeAddress"]],
-  },
-];
+const NAVY = "#0b2c6e";
 
 /** Resize to max 800px and re-encode as JPEG, so any phone photo fits the 500 KB limit and the PDF card. */
 async function toJpeg(f: File): Promise<File> {
@@ -111,22 +70,21 @@ async function toJpeg(f: File): Promise<File> {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const showDate = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v.split("-").reverse().join("-") : v);
 
-function photoError(f?: File | null) {
-  if (!f) return "Please add your passport-size photo";
+function imageError(f?: File | null, required = true) {
+  if (!f) return required ? "Please add your passport-size photo" : null;
   if (!PHOTO_TYPES.includes(f.type)) return "Use a JPG or PNG image";
-  if (f.size > MAX_PHOTO) return "Photo must be under 500 KB";
+  if (f.size > MAX_PHOTO) return "Image must be under 500 KB";
   return null;
 }
 
 function messageFor(el: Control) {
-  if (el instanceof HTMLInputElement && el.type === "file") return photoError(el.files?.[0]);
+  if (el instanceof HTMLInputElement && el.type === "file") return imageError(el.files?.[0], el.required);
   const v = el.validity;
   if (v.valueMissing) {
     if (el.type === "radio") return "Please choose one";
     if (el.type === "checkbox") return "Please accept the declaration";
-    return "This field is required";
+    return el instanceof HTMLSelectElement ? "Please select one" : "This field is required";
   }
   if (v.typeMismatch) return "Enter a valid email address";
   if (v.patternMismatch) return el.dataset.msg ?? "Check the format";
@@ -134,92 +92,98 @@ function messageFor(el: Control) {
   return null;
 }
 
-export function RegisterForm() {
-  const formRef = useRef<HTMLFormElement>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(0);
+const INP =
+  "h-[30px] w-full rounded-[3px] border border-[#bccbdf] bg-white px-2.5 text-[14px] text-[#16233b] outline-none transition placeholder:text-[#7b8798] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20 aria-invalid:border-[#e11d48] aria-invalid:ring-2 aria-invalid:ring-[#e11d48]/15 disabled:cursor-not-allowed disabled:bg-[#fafbfd]";
+const AREA = INP.replace("h-[30px]", "resize-none py-1.5 leading-snug");
+const GREEN_BTN =
+  "rounded-md bg-[#2f9a46] px-3 py-1.5 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60";
+
+/** Applicants get only the fields they fill in; staff (`saved`) get the full sheet including office sections 4-6. */
+export function MembershipForm({ saved, office }: { saved?: SavedApplication; office?: React.ReactNode }) {
+  const v = saved?.values ?? null;
+  const ro = !!saved;
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const locked = ro && !editing;
   const [errors, setErrors] = useState<Errors>({});
   const [message, setMessage] = useState("");
-  const [summary, setSummary] = useState<Record<string, string>>({});
-  const [photo, setPhoto] = useState<{ url: string; name: string; size: number }>();
+  const [name, setName] = useState(v?.name ?? "");
+  const [posting, setPosting] = useState(v?.posting ?? "");
+  const [hq, setHq] = useState(v?.headquarters ?? "");
+  const savedPhoto = saved && { url: `/api/photo/${saved.id}`, name: "" };
+  const savedSignature = saved?.hasSignature ? { url: `/api/photo/${saved.id}?signature`, name: "" } : undefined;
+  const [photo, setPhoto] = useState<Preview | undefined>(savedPhoto);
+  const [signature, setSignature] = useState<Preview | undefined>(savedSignature);
   const [done, setDone] = useState<{ ref?: string }>();
   const [pending, startTransition] = useTransition();
 
-  const panel = (i: number) => formRef.current?.querySelector<HTMLElement>(`[data-step="${i}"]`);
-
-  function checkStep(i: number) {
-    const errs: Errors = {};
-    panel(i)?.querySelectorAll<Control>("input,select,textarea").forEach((el) => {
-      const name = el.name as Name;
-      if (!name || errs[name]) return;
-      const msg = messageFor(el);
-      if (msg) errs[name] = [msg];
-    });
-    return errs;
-  }
-
-  function goTo(i: number) {
-    if (i === LAST && formRef.current) {
-      const data = new FormData(formRef.current);
-      setSummary(Object.fromEntries([...data].filter(([, v]) => typeof v === "string")) as Record<string, string>);
-    }
-    setStep(i);
-    setMaxStep((m) => Math.max(m, i));
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function next() {
-    const errs = checkStep(step);
-    setErrors((prev) => {
-      const kept = { ...prev };
-      STEPS[step].fields.forEach((f) => delete kept[f]);
-      return { ...kept, ...errs };
-    });
-    const first = Object.keys(errs)[0];
-    if (first) {
-      panel(step)?.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
-      return;
-    }
-    setMessage("");
-    goTo(step + 1);
-  }
-
   function submit(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
-    if (step < LAST) return next();
-    const errs = checkStep(LAST);
-    if (Object.keys(errs).length) return setErrors(errs);
+    const form = ev.currentTarget;
+    const errs: Errors = {};
+    form.querySelectorAll<Control>("[name]:not(:disabled)").forEach((el) => {
+      const n = el.name as Name;
+      const msg = errs[n] ? null : messageFor(el);
+      if (msg) errs[n] = [msg];
+    });
+    setErrors(errs);
+    const first = Object.keys(errs)[0];
+    if (first) {
+      setMessage("Please fix the highlighted fields.");
+      form.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
+      return;
+    }
 
-    const data = new FormData(ev.currentTarget);
+    const data = new FormData(form);
+    setMessage("");
     startTransition(async () => {
       try {
+        if (saved) {
+          const res = await updateApplication(saved.id, data);
+          if (res.ok) {
+            router.refresh();
+            setEditing(false);
+            return;
+          }
+          setErrors(res.errors ?? {});
+          setMessage(res.message ?? "Please check the highlighted fields.");
+          return;
+        }
         const res = await register({}, data);
         if (res.ok) return setDone({ ref: res.ref });
         setErrors(res.errors ?? {});
         setMessage(res.message ?? "Please check the highlighted fields.");
-        const bad = STEPS.findIndex((s) => s.fields.some((f) => res.errors?.[f]));
-        if (bad >= 0) setStep(bad);
       } catch {
         setMessage("Could not submit right now. Please try again in a moment.");
       }
     });
   }
 
+  function cancelEdit() {
+    setEditing(false);
+    setErrors({});
+    setMessage("");
+    setName(v?.name ?? "");
+    setPosting(v?.posting ?? "");
+    setHq(v?.headquarters ?? "");
+    setPhoto(savedPhoto);
+    setSignature(savedSignature);
+  }
+
   function clearError(ev: React.FormEvent<HTMLFormElement>) {
-    const name = (ev.target as Control).name as Name;
-    if (errors[name]) {
+    const n = (ev.target as Control).name as Name;
+    if (errors[n]) {
       setErrors((prev) => {
         const copy = { ...prev };
-        delete copy[name];
+        delete copy[n];
         return copy;
       });
     }
   }
 
-  async function pickPhoto(picked?: File) {
-    const input = photoRef.current!;
-    if (!picked) return setPhoto(undefined);
+  async function pickImage(input: HTMLInputElement, set: (p?: Preview) => void) {
+    const picked = input.files?.[0];
+    if (!picked) return set(undefined);
     let f: File | undefined;
     try {
       f = await toJpeg(picked);
@@ -229,97 +193,62 @@ export function RegisterForm() {
     } catch {
       f = undefined;
     }
-    const err = f ? photoError(f) : "Could not read this image. Please choose a JPG or PNG photo.";
-    setPhoto(f && !err ? { url: URL.createObjectURL(f), name: picked.name, size: f.size } : undefined);
+    const err = f ? imageError(f) : "Could not read this image. Please choose a JPG or PNG.";
+    set(f && !err ? { url: URL.createObjectURL(f), name: picked.name } : undefined);
     if (err) {
-      setErrors((prev) => ({ ...prev, photo: [err] }));
+      setErrors((prev) => ({ ...prev, [input.name]: [err] }));
       input.value = "";
     }
   }
 
   if (done) return <Success refNo={done.ref} />;
 
-  const current = STEPS[step];
-  const pct = Math.round(((step + 1) / STEPS.length) * 100);
+  const e = errors;
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr] lg:items-start">
-      {/* Stepper */}
-      <aside className="hidden space-y-4 lg:sticky lg:top-24 lg:block">
-        <ol className="card p-3">
-          {STEPS.map((s, i) => {
-            const isCurrent = i === step;
-            const isDone = !isCurrent && i < maxStep;
-            return (
-              <li key={s.short} className="relative">
-                {i < LAST && <span className="absolute top-[3.25rem] left-[1.94rem] h-4 w-px bg-line" aria-hidden />}
-                <button
-                  type="button"
-                  disabled={i > maxStep}
-                  onClick={() => goTo(i)}
-                  aria-current={isCurrent ? "step" : undefined}
-                  className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition disabled:cursor-not-allowed ${
-                    isCurrent ? "bg-accent-soft" : "enabled:hover:bg-ink/[0.04]"
-                  }`}
-                >
-                  <span
-                    className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${
-                      isDone ? "border-accent bg-accent text-on-accent" : isCurrent ? "border-accent text-accent" : "border-line text-muted"
-                    }`}
-                  >
-                    {isDone ? <Check size={16} weight="bold" /> : <s.icon size={17} weight={isCurrent ? "fill" : "regular"} />}
-                  </span>
-                  <span>
-                    <span className="block text-xs text-muted">Step {i + 1}</span>
-                    <span className={`block text-sm font-semibold ${i > maxStep ? "text-muted" : ""}`}>{s.short}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        <div className="card flex gap-3 p-4 text-sm">
-          <Info size={20} weight="fill" className="mt-0.5 shrink-0 text-accent" />
-          <p className="text-muted">
-            Your details are only seen by the Operation Team. Need help? Visit the head office at Tripuri Town, Patiala.
-          </p>
-        </div>
-      </aside>
+  const sheet =
+    "mx-auto w-full max-w-[1240px] overflow-hidden rounded-xl bg-[#f4f8fd] text-[#16233b] shadow-[0_20px_60px_-30px_rgb(11_44_110/0.45)] ring-1 ring-[#0b2c6e]/10";
 
-      {/* Form card */}
-      <form ref={formRef} noValidate onSubmit={submit} onChange={clearError} className="card scroll-mt-24 overflow-hidden">
-        <header className="border-b border-line p-6 sm:p-8">
-          <div className="flex items-center justify-between text-xs font-medium text-muted">
-            <span>
-              Step {step + 1} of {STEPS.length}
-            </span>
-            <span>{pct}% complete</span>
+  const body = (
+    <>
+      <Banner />
+
+      <div className="space-y-3.5 px-3 pt-3 pb-4 sm:px-5">
+        {/* Title row */}
+        <div className={`grid grid-cols-1 gap-3.5 ${ro ? "md:grid-cols-[1fr_350px]" : ""}`}>
+          <div className="flex min-h-[52px] items-center gap-4 rounded-md bg-linear-to-r from-[#0a2a66] to-[#1c4c9e] px-5 text-white shadow-sm">
+            <User size={34} weight="fill" />
+            <h2 className="text-[20px] font-bold tracking-tight uppercase sm:text-[27px]">Membership Application Form</h2>
           </div>
-          <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-ink/[0.07]">
-            <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="mt-6 flex items-start gap-4">
-            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
-              <current.icon size={24} weight="duotone" />
-            </span>
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight">{current.title}</h2>
-              <p className="mt-1 text-sm text-muted">{current.desc}</p>
+          {ro && (
+            <div className="flex min-h-[52px] items-center justify-between gap-3 rounded-md border border-[#c6d9f1] bg-[#e9f2fd] px-4">
+              <span className="text-[17px] font-semibold" style={{ color: NAVY }}>
+                Membership No.
+              </span>
+              <MembershipNo value={v?.membershipNo} className="text-[24px]" />
             </div>
-          </div>
-        </header>
+          )}
+        </div>
 
-        <div className="p-6 sm:p-8">
-          {/* 1. Personal */}
-          <StepPanel index={0} step={step}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Full Name" name="name" icon={User} e={errors} autoComplete="name" placeholder="As in service records" />
-              <Field label="Father's Name" name="fatherName" icon={User} e={errors} />
-              <Field label="Date of Birth" name="dob" type="date" e={errors} />
-              <Field
-                label="Mobile Number"
+        {editing && (
+          <p className="rounded-md border border-[#f6c98b] bg-[#fff8ef] px-4 py-2.5 text-[14px] text-[#5a3b0b]">
+            <strong>Editing as Master ID.</strong> Correct any field, then press <strong>Save changes</strong> in section 6. Every change
+            is recorded in the audit trail.
+          </p>
+        )}
+
+        {/* Personal | photo | posting summary */}
+        <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[1fr_222px_338px]">
+          <Panel>
+            <Head n={1} title="Personal Details" icon={User} />
+            <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 p-4 sm:grid-cols-[160px_1fr] sm:items-center">
+              <Row label="Full Name" req htmlFor="name" />
+              <Text name="name" e={e} autoComplete="name" placeholder="As in service records" onChange={(ev) => setName(ev.target.value)} />
+              <Row label="Father's Name" req htmlFor="fatherName" />
+              <Text name="fatherName" e={e} />
+              <Row label="Mobile Number" req htmlFor="contact" />
+              <Text
                 name="contact"
-                icon={Phone}
+                e={e}
                 type="tel"
                 inputMode="numeric"
                 maxLength={10}
@@ -327,351 +256,692 @@ export function RegisterForm() {
                 data-msg="Enter a 10-digit mobile number"
                 autoComplete="tel-national"
                 placeholder="98XXXXXXXX"
-                e={errors}
               />
-              <Field label="Email Address" name="email" icon={EnvelopeSimple} type="email" autoComplete="email" placeholder="you@example.com" e={errors} className="sm:col-span-2" />
-              <Field label="Residential Address" name="address" icon={House} textarea e={errors} className="sm:col-span-2" />
-              <Field
-                label="Pin Code"
+              <Row label="Email Address" req htmlFor="email" />
+              <Text name="email" e={e} type="email" autoComplete="email" placeholder="you@example.com" />
+              <Row label="Date of Birth" req htmlFor="dob" />
+              <Text name="dob" e={e} type="date" max={today()} className="sm:max-w-[196px]" />
+              <Row label="Residential Address" req htmlFor="address" className="self-start pt-1.5" />
+              <Text name="address" e={e} textarea rows={2} className="h-[56px]" />
+              <Row label="Pin Code" req htmlFor="pinCode" />
+              <Text
                 name="pinCode"
-                icon={MapPin}
+                e={e}
                 inputMode="numeric"
                 maxLength={6}
                 pattern="[1-9][0-9]{5}"
                 data-msg="Enter a 6-digit PIN code"
                 autoComplete="postal-code"
-                e={errors}
+                className="sm:max-w-[196px]"
               />
             </div>
-          </StepPanel>
+          </Panel>
 
-          {/* 2. Service */}
-          <StepPanel index={1} step={step}>
-            <div className="space-y-7">
-              <Choice
-                label="Organisation"
-                name="company"
-                e={errors}
-                className="sm:grid-cols-2"
-                options={[
-                  { value: "PSPCL", label: "PSPCL", sub: "Punjab State Power Corporation Ltd.", icon: Lightning },
-                  { value: "PSTCL", label: "PSTCL", sub: "Punjab State Transmission Corporation Ltd.", icon: Buildings },
-                ]}
-              />
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Designation" name="designation" icon={Briefcase} list="designations" hint="For example JE (Electrical)" e={errors} />
-                <Field label="Employee ID No." name="employeeId" icon={IdentificationCard} hint="As on your department ID card" e={errors} />
-                <Field label="Date of Joining PSPCL/PSTCL" name="dojCompany" type="date" e={errors} />
-                <Field label="Joined As" name="dojCompanyAs" list="designations" placeholder="Post at joining" e={errors} />
-                <Field label="Date of Joining Current Post" name="dojCurrentPost" type="date" e={errors} />
-                <Field label="Current Post" name="dojCurrentPostAs" list="designations" placeholder="Present post" e={errors} />
-              </div>
-              <Choice
-                label="Technical Qualification"
-                name="qualification"
-                e={errors}
-                chips
-                options={["ITI", "Diploma", "BE", "B.Tech", "M.Tech"].map((q) => ({ value: q, label: q }))}
-              />
-              <Choice
-                label="Discipline"
-                name="discipline"
-                e={errors}
-                className="sm:grid-cols-3"
-                options={[
-                  { value: "Civil", label: "Civil", icon: HardHat },
-                  { value: "Electrical", label: "Electrical", icon: Lightning },
-                  { value: "Mechanical", label: "Mechanical", icon: GearSix },
-                ]}
-              />
-            </div>
-            <datalist id="designations">
-              {["JE (Electrical)", "JE (Civil)", "JE (Mechanical)", "AAE"].map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
-          </StepPanel>
-
-          {/* 3. Posting */}
-          <StepPanel index={2} step={step}>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Nearby or Posting Zone" name="zone" icon={MapPin} list="zones" hint="Pick from the list or type" e={errors} />
-              <Field label="Nearby or Posting Circle" name="circle" icon={MapPin} e={errors} />
-              <Field label="Division / Office" name="division" icon={Buildings} e={errors} />
-              <Field label="Sub Division / Office" name="subDivision" icon={Buildings} e={errors} />
-              <Field label="Office Address" name="officeAddress" icon={House} textarea e={errors} className="sm:col-span-2" />
-            </div>
-            <datalist id="zones">
-              {["North (Jalandhar)", "South (Patiala)", "West (Bathinda)", "Central (Ludhiana)", "Border (Amritsar)"].map((z) => (
-                <option key={z} value={z} />
-              ))}
-            </datalist>
-          </StepPanel>
-
-          {/* 4. Photo */}
-          <StepPanel index={3} step={step}>
-            <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
-              <div className="mx-auto w-full max-w-[220px]">
-                <div
-                  className={`relative grid aspect-[3/4] place-items-center overflow-hidden rounded-2xl border-2 border-dashed bg-ink/[0.02] transition ${
-                    errors.photo ? "border-danger" : photo ? "border-accent/50" : "border-line hover:border-accent/60"
-                  }`}
-                >
-                  {photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- local blob preview
-                    <img src={photo.url} alt="Your selected photo" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="px-4 text-center">
-                      <span className="mx-auto grid size-12 place-items-center rounded-full bg-accent-soft text-accent">
-                        <UploadSimple size={22} weight="bold" />
-                      </span>
-                      <p className="mt-3 text-sm font-semibold">Upload photo</p>
-                      <p className="mt-1 text-xs text-muted">Click or drag and drop</p>
-                    </div>
-                  )}
-                  <input
-                    ref={photoRef}
-                    id="photo"
-                    name="photo"
-                    type="file"
-                    accept="image/*"
-                    required
-                    aria-label="Passport-size photo"
-                    aria-invalid={!!errors.photo}
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    onChange={(ev) => pickPhoto(ev.target.files?.[0])}
-                  />
-                </div>
-                {photo && (
-                  <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-                    <span className="min-w-0 truncate text-muted">
-                      {photo.name} · {Math.round(photo.size / 1024)} KB
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (photoRef.current) photoRef.current.value = "";
-                        setPhoto(undefined);
-                      }}
-                      className="flex shrink-0 items-center gap-1 font-semibold text-danger"
-                    >
-                      <Trash size={14} /> Remove
-                    </button>
-                  </div>
-                )}
-                <FieldError msg={errors.photo} />
-              </div>
-              <div className="rounded-2xl border border-line bg-ink/[0.02] p-5">
-                <p className="font-semibold">Photo guidelines</p>
-                <ul className="mt-4 space-y-3 text-sm text-ink/80">
-                  {["Recent passport-size colour photo", "Plain, light background", "Face clearly visible, looking at the camera", "Any photo from your phone or computer; we resize it for you"].map((t) => (
-                    <li key={t} className="flex gap-2.5">
-                      <CheckCircle size={18} weight="fill" className="shrink-0 text-accent" /> {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </StepPanel>
-
-          {/* 5. Review */}
-          <StepPanel index={4} step={step}>
-            <div className="space-y-4">
-              {REVIEW.map((g) => (
-                <section key={g.title} className="rounded-2xl border border-line bg-ink/[0.02] p-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">{g.title}</h3>
-                    <button type="button" onClick={() => goTo(g.step)} className="flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
-                      <PencilSimple size={14} weight="bold" /> Edit
-                    </button>
-                  </div>
-                  <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                    {g.rows.map(([label, key]) => (
-                      <div key={key} className={key.toLowerCase().includes("address") ? "sm:col-span-2" : ""}>
-                        <dt className="text-xs text-muted">{label}</dt>
-                        <dd className="mt-0.5 text-sm font-medium break-words">{showDate(summary[key] ?? "") || "-"}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              ))}
-              <section className="flex items-center gap-4 rounded-2xl border border-line bg-ink/[0.02] p-5">
-                {photo && (
-                  // eslint-disable-next-line @next/next/no-img-element -- local blob preview
-                  <img src={photo.url} alt="Your selected photo" className="h-20 w-16 rounded-lg object-cover" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold">Passport Photo</h3>
-                  <p className="truncate text-sm text-muted">{photo?.name ?? "No photo selected"}</p>
-                </div>
-                <button type="button" onClick={() => goTo(3)} className="flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
-                  <PencilSimple size={14} weight="bold" /> Edit
-                </button>
-              </section>
-
-              <label
-                className={`flex cursor-pointer gap-4 rounded-2xl border p-5 text-sm leading-relaxed transition has-checked:border-accent/60 has-checked:bg-accent-soft ${
-                  errors.declarationAccepted ? "border-danger" : "border-line"
-                }`}
-              >
-                <input type="checkbox" name="declarationAccepted" required className="peer sr-only" />
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border border-line text-transparent transition peer-checked:border-accent peer-checked:bg-accent peer-checked:text-on-accent peer-focus-visible:ring-4 peer-focus-visible:ring-accent/20">
-                  <Check size={13} weight="bold" />
+          <Panel className="flex flex-col p-2.5">
+            <label
+              className={`relative mx-auto block h-[156px] w-[136px] cursor-pointer overflow-hidden rounded-md border-2 bg-[#eef3fa] transition ${
+                e.photo ? "border-[#e11d48]" : "border-[#1e3a6e] hover:border-[#2563eb]"
+              }`}
+            >
+              {photo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local blob preview
+                <img src={photo.url} alt="Passport photo" className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full place-items-center px-2 text-center text-[12px] text-[#4a5a72]">
+                  <span>
+                    <Camera size={30} className="mx-auto mb-1.5 text-[#1e3a6e]" />
+                    Upload passport photo <span className="text-[#e11d48]">*</span>
+                  </span>
                 </span>
-                <span className="text-ink/85">
-                  I, <strong className="text-ink">{summary.name || "the applicant"}</strong>, solemnly affirm that I want to be a member
-                  of the “Association of Junior Engineers”. I shall abide by the rules of its constitution and perform the duties
-                  assigned to me. I subscribe to the membership (as decided by the general house, including special contribution, if
-                  any) and authorize the Association and PSPCL/PSTCL to deduct it from my salary. If I fail to pay for six consecutive
-                  months, my membership may be ceased without notice.
+              )}
+              {!locked && <input
+                name="photo"
+                type="file"
+                accept="image/*"
+                required={!ro}
+                aria-label="Passport-size photo"
+                aria-invalid={!!e.photo}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                onChange={(ev) => pickImage(ev.target, setPhoto)}
+              />}
+            </label>
+            <FieldError msg={e.photo} center />
+            <p className="mt-2 truncate rounded-md px-2 py-1.5 text-center text-[19px] font-bold text-white uppercase" style={{ background: NAVY }}>
+              {name.trim() || "Your Name"}
+            </p>
+            <label
+              className={`relative mt-2 grid h-[82px] cursor-pointer place-items-center overflow-hidden rounded-md border bg-white transition ${
+                e.signature ? "border-[#e11d48]" : "border-[#c6d9f1] hover:border-[#2563eb]"
+              }`}
+            >
+              {signature ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local blob preview
+                <img src={signature.url} alt="Your signature" className="h-full w-full object-contain p-1" />
+              ) : (
+                <span className="flex items-center gap-1.5 text-[12px] text-[#4a5a72]">
+                  <PenNib size={18} className="text-[#1e3a6e]" /> {locked ? "No signature uploaded" : "Upload signature"}
                 </span>
-              </label>
-              <FieldError msg={errors.declarationAccepted} />
-            </div>
-          </StepPanel>
+              )}
+              {!locked && <input
+                name="signature"
+                type="file"
+                accept="image/*"
+                aria-label="Member signature"
+                aria-invalid={!!e.signature}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                onChange={(ev) => pickImage(ev.target, setSignature)}
+              />}
+            </label>
+            <FieldError msg={e.signature} center />
+            <p className="mt-1.5 text-center text-[13px] leading-tight text-[#26344d]">
+              <span className="font-semibold">Member Signature</span>
+              <br />
+              (Uploaded at the time of signup)
+            </p>
+          </Panel>
+
+          <Panel className="divide-y divide-[#cfdcee] bg-[#eef5fe] px-4 py-2">
+            <Info icon={MapPin} title="Posting / Office">
+              <p className={`min-h-[44px] text-[15px] leading-snug break-words ${posting ? "" : "text-[#7b8798]"}`}>
+                {posting || "For Ex: Patiala Circle under South Zone, PSPCL, Patiala"}
+              </p>
+            </Info>
+            <Info icon={Buildings} title="Headquarters">
+              <input
+                list="headquarters-list"
+                aria-label="Headquarters"
+                value={hq}
+                readOnly={locked}
+                onChange={(ev) => setHq(ev.target.value)}
+                placeholder="Select or type headquarters"
+                aria-invalid={!!e.headquarters}
+                className={INP}
+              />
+            </Info>
+            <Info icon={Briefcase} title="Designation" req>
+              <Select name="designation" e={e} defaultValue="">
+                <option value="" disabled>
+                  Select Designation
+                </option>
+                {DESIGNATIONS.map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
+              </Select>
+            </Info>
+            <Info icon={UsersThree} title="Organisation">
+              <Select name="company" e={e} defaultValue="PSPCL">
+                <option>PSPCL</option>
+                <option>PSTCL</option>
+              </Select>
+            </Info>
+          </Panel>
         </div>
 
-        <footer className="flex flex-col-reverse gap-3 border-t border-line p-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          {step > 0 ? (
-            <button type="button" onClick={() => goTo(step - 1)} className="btn-outline px-5 py-3">
-              <ArrowLeft size={16} weight="bold" /> Back
-            </button>
-          ) : (
-            <Link href="/" className="btn-outline px-5 py-3">
-              Cancel
-            </Link>
+        {/* Professional + membership | approval */}
+        <div className={`grid grid-cols-1 gap-3.5 ${ro ? "lg:grid-cols-[1fr_475px]" : ""}`}>
+          <div className="space-y-3.5">
+            <Panel>
+              <Head n={2} title="Professional Details" icon={Article} />
+              <div className="grid grid-cols-1 gap-x-8 gap-y-3 p-4 md:grid-cols-2 md:divide-x md:divide-[#dbe5f2]">
+                <div className="space-y-3 md:pr-2">
+                  <Stack label="Employee ID No." req name="employeeId">
+                    <Text name="employeeId" e={e} placeholder="As on your department ID card" />
+                  </Stack>
+                  <Stack label="Nearby or Posting Zone" req name="zone">
+                    <Text name="zone" e={e} list="zones" placeholder="Pick from the list or type" />
+                  </Stack>
+                  <Stack label="Nearby or Posting Circle" req name="circle">
+                    <Text name="circle" e={e} />
+                  </Stack>
+                  <Stack label="Division / Office" req name="division">
+                    <Text name="division" e={e} />
+                  </Stack>
+                  <Stack label="Sub Division / Office" req name="subDivision">
+                    <Text name="subDivision" e={e} />
+                  </Stack>
+                </div>
+                <div className="space-y-3 md:pl-6">
+                  <Stack label="Contact No. (Office)" name="officeContact">
+                    <Text name="officeContact" e={e} type="tel" required={false} />
+                  </Stack>
+                  <Stack label="Email (Official)" name="officialEmail">
+                    <Text name="officialEmail" e={e} type="email" required={false} />
+                  </Stack>
+                  <Stack label="Headquarters" req name="headquarters">
+                    <Text
+                      name="headquarters"
+                      e={e}
+                      list="headquarters-list"
+                      value={hq}
+                      onChange={(ev) => setHq(ev.target.value)}
+                      placeholder="Select or type headquarters / office"
+                    />
+                  </Stack>
+                  <Stack label="Posting / Office" req name="posting">
+                    <Text
+                      name="posting"
+                      e={e}
+                      textarea
+                      rows={2}
+                      className="h-[46px]"
+                      placeholder="For Ex: Patiala Circle under South Zone, PSPCL, Patiala"
+                      onChange={(ev) => setPosting(ev.target.value)}
+                    />
+                  </Stack>
+                  <Stack label="Office Address" req name="officeAddress">
+                    <Text name="officeAddress" e={e} textarea rows={2} className="h-[46px]" />
+                  </Stack>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-3 border-t border-[#dbe5f2] p-4 md:grid-cols-2">
+                <Stack label="Date of Joining PSPCL/PSTCL" req name="dojCompany">
+                  <Text name="dojCompany" e={e} type="date" max={today()} />
+                </Stack>
+                <Stack label="Joined As" req name="dojCompanyAs">
+                  <Text name="dojCompanyAs" e={e} list="designations" placeholder="Post at joining" />
+                </Stack>
+                <Stack label="Date of Joining Current Post" req name="dojCurrentPost">
+                  <Text name="dojCurrentPost" e={e} type="date" max={today()} />
+                </Stack>
+                <Stack label="Current Post" req name="dojCurrentPostAs">
+                  <Text name="dojCurrentPostAs" e={e} list="designations" placeholder="Present post" />
+                </Stack>
+                <Stack label="Technical Qualification" req name="qualification">
+                  <Choices name="qualification" e={e} options={QUALIFICATIONS} />
+                </Stack>
+                <Stack label="Discipline" req name="discipline">
+                  <Choices name="discipline" e={e} options={DISCIPLINES} />
+                </Stack>
+              </div>
+              <datalist id="headquarters-list">
+                {HEADQUARTERS.map((h) => (
+                  <option key={h} value={h} />
+                ))}
+              </datalist>
+              <datalist id="zones">
+                {ZONES.map((z) => (
+                  <option key={z} value={z} />
+                ))}
+              </datalist>
+              <datalist id="designations">
+                {DESIGNATIONS.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            </Panel>
+
+            <Panel>
+              <Head n={3} title="Membership Details" icon={IdentificationCard} />
+              <div className={`grid grid-cols-1 gap-4 p-4 ${ro ? "md:grid-cols-[1fr_215px]" : "md:max-w-[620px]"}`}>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-[140px_1fr] sm:items-center">
+                  <Row label="Membership Type" htmlFor="membershipType" />
+                  <Select name="membershipType" id="membershipType" e={e} defaultValue="" required={false}>
+                    <option value="">Select Membership Type</option>
+                    {MEMBERSHIP_TYPES.map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </Select>
+                  <Row label="Date of Application" htmlFor="appDate" />
+                  <input id="appDate" type="date" value={v?.createdAt ?? today()} readOnly className={INP} />
+                </div>
+                {ro && (
+                  <div className="grid place-items-center rounded-md border border-[#c6d9f1] bg-[#e9f2fd] px-3 py-2.5 text-center">
+                    <div>
+                      <p className="text-[14px] font-semibold" style={{ color: NAVY }}>
+                        Membership No.
+                      </p>
+                      <MembershipNo value={v?.membershipNo} className="mt-1 text-[19px]" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          </div>
+
+          {saved && (
+
+          <Panel>
+            <Head n={4} title="Approval / Remarks" icon={ClipboardText} note="For office use" />
+            <div className="space-y-3 p-4 text-[14px]">
+              <fieldset disabled>
+                <legend className="mb-1.5 font-semibold" style={{ color: NAVY }}>
+                  Application Status
+                </legend>
+                <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                  {(["pending", "approved", "rejected"] as const).map((st) => (
+                    <Radio key={st} name="office-status" label={st[0].toUpperCase() + st.slice(1)} checked={saved.status === st} />
+                  ))}
+                </div>
+              </fieldset>
+              <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[150px_1fr]">
+                <p className="font-semibold" style={{ color: NAVY }}>
+                  {saved.status === "rejected" ? "Rejected By" : "Approved By"}
+                </p>
+                <input readOnly aria-label="Reviewed by" value={v?.reviewer ?? ""} className={INP} />
+                <p className="font-semibold" style={{ color: NAVY }}>
+                  {saved.status === "rejected" ? "Rejection Date" : "Approval Date"}
+                </p>
+                <input readOnly type="date" aria-label="Review date" value={v?.reviewedAt ?? ""} className={INP} />
+              </div>
+              <div>
+                <p className="mb-1.5 font-semibold" style={{ color: NAVY }}>
+                  Comments / Remarks
+                </p>
+                <textarea readOnly aria-label="Remarks" value={v?.rejectionReason ?? ""} className={`${AREA} h-[60px]`} />
+              </div>
+              {office && !editing && <div className="border-t border-[#dbe5f2] pt-3">{office}</div>}
+            </div>
+          </Panel>
           )}
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-            {message && (
-              <p className="flex items-center gap-1.5 text-sm text-danger" aria-live="polite">
-                <WarningCircle size={16} weight="fill" className="shrink-0" /> {message}
-              </p>
-            )}
-            <button type="submit" disabled={pending} className="btn-accent px-6 py-3">
-              {step < LAST ? (
-                <>
-                  Continue <ArrowRight size={16} weight="bold" />
-                </>
-              ) : pending ? (
-                "Submitting…"
-              ) : (
+        </div>
+
+        {saved && (
+        <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-[470px_1fr]">
+          <Panel tone="orange">
+            <Head n={5} title="Approving Authority" icon={UserCircle} tone="orange" />
+            <div className="grid grid-cols-2 gap-3 p-2.5">
+              {["General Secretary", "State President"].map((t) => (
+                <div key={t} className="flex h-[124px] flex-col rounded-md border border-[#f3d3a6] bg-white/70 px-3 pt-2.5 pb-1.5 text-center">
+                  <p className="text-[14px] leading-tight font-semibold">
+                    {t}
+                    <br />
+                    AOJE Punjab
+                  </p>
+                  <div className="mx-2 mt-auto border-t border-[#8a97a8]" />
+                  <p className="mt-1.5 text-[12.5px] text-[#3b4658]">(Signature &amp; Seal)</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel tone="green">
+            <Head n={6} title="Admin / Master ID" small="(For Any Changes)" icon={Leaf} tone="green" />
+            <div className="grid grid-cols-1 gap-3 p-2.5 text-[13px] md:grid-cols-[200px_1fr]">
+              <div className="space-y-1.5">
+                <span className="block">Master ID</span>
+                <input readOnly aria-label="Master ID" value={saved.masterId} className={`${INP} h-[26px]`} />
+                {v?.loginId && <p className="text-[11.5px] text-[#4a5a72]">Member login: {v.loginId}</p>}
+                {saved.canEdit && !editing && (
+                  <button type="button" onClick={() => setEditing(true)} className={`${GREEN_BTN} mt-1 w-full`}>
+                    Correct Details
+                  </button>
+                )}
+                {editing && (
+                  <>
+                    <label htmlFor="editRemarks" className="block pt-1">
+                      Remarks
+                    </label>
+                    <textarea
+                      id="editRemarks"
+                      name="editRemarks"
+                      placeholder="Reason for the change..."
+                      className={`${AREA} h-[58px] text-[12.5px]`}
+                    />
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={pending} className={`${GREEN_BTN} flex-1`}>
+                        {pending ? "Saving…" : "Save changes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="rounded-md border border-[#bfe0c3] bg-white px-3 py-1.5 font-semibold text-[#1d5a2a]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {message && (
+                      <p className="flex items-center gap-1 text-[12.5px] text-[#e11d48]" aria-live="polite">
+                        <WarningCircle size={14} weight="fill" className="shrink-0" /> {message}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="rounded-md border border-[#bfe0c3] bg-white/70 p-1.5">
+                <p className="mb-1 flex items-center gap-1 text-[12.5px] font-semibold text-[#1d5a2a]">
+                  <Check size={12} weight="bold" /> Edit History / Audit Trail
+                </p>
+                <table className="w-full border-collapse text-[11.5px]">
+                  <thead>
+                    <tr className="bg-[#eef7ef]">
+                      {["Date & Time", "Field Changed", "Changed By"].map((h) => (
+                        <th key={h} className="border border-[#d4e6d6] px-1.5 py-1 text-left font-medium">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {saved.audit.map((row, i) => (
+                      <tr key={i}>
+                        {row.map((c, j) => (
+                          <td key={j} className="border border-[#d4e6d6] px-1.5 py-1">
+                            {c}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Panel>
+        </div>
+        )}
+
+        {/* Declaration + submit */}
+        <Panel className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
+          <label className="flex flex-1 cursor-pointer gap-3 text-[13px] leading-relaxed text-[#26344d]">
+            <input
+              type="checkbox"
+              name="declarationAccepted"
+              required
+              defaultChecked={ro}
+              disabled={ro}
+              aria-invalid={!!e.declarationAccepted}
+              className="mt-0.5 size-4 shrink-0 accent-[#0b2c6e]"
+            />
+            <span>
+              I, <strong>{name.trim() || "the applicant"}</strong>, solemnly affirm that I want to be a member of the
+              “Association of Junior Engineers”. I shall abide by the rules of its constitution and perform the duties assigned to
+              me. I subscribe to the membership (as decided by the general house, including special contribution, if any) and
+              authorize the Association and PSPCL/PSTCL to deduct it from my salary. If I fail to pay for six consecutive months, my
+              membership may be ceased without notice.
+              <FieldError msg={e.declarationAccepted} />
+            </span>
+          </label>
+          {!ro && <div className="flex shrink-0 flex-col items-stretch gap-2 md:items-end">
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-linear-to-r from-[#0a2a66] to-[#1c4c9e] px-7 py-3 text-[15px] font-bold text-white uppercase shadow-sm transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+            >
+              {pending ? "Submitting…" : (
                 <>
                   Submit Application <Check size={16} weight="bold" />
                 </>
               )}
             </button>
-          </div>
-        </footer>
-      </form>
+            {message && (
+              <p className="flex items-center gap-1.5 text-[13px] text-[#e11d48]" aria-live="polite">
+                <WarningCircle size={15} weight="fill" className="shrink-0" /> {message}
+              </p>
+            )}
+          </div>}
+        </Panel>
+      </div>
+
+      {/* Footer band */}
+      <div className="relative flex h-[42px] items-center gap-3 overflow-hidden px-5 text-white" style={{ background: NAVY }}>
+        <UsersThree size={26} weight="fill" className="shrink-0" />
+        <p className="truncate pr-40 text-[13px] font-semibold sm:text-[15px]">
+          AOJ Punjab – Empowering Junior Engineers, Building a Better Future
+        </p>
+        <span className="absolute top-0 right-[110px] h-full w-[70px] -skew-x-[40deg] bg-[#2f6fd6]" aria-hidden />
+        <span className="absolute top-0 right-[30px] h-full w-[70px] -skew-x-[40deg] bg-[#f5b316]" aria-hidden />
+        <span className="absolute top-0 -right-[40px] h-full w-[60px] -skew-x-[40deg] bg-[#2f6fd6]" aria-hidden />
+      </div>
+    </>
+  );
+
+  // Read-only staff view is a plain div: the review controls in `office` carry their own forms. Always light, like the paper form.
+  return (
+    <Saved value={v && { values: v, locked }}>
+      {locked ? (
+        <div data-theme="light" className={sheet}>
+          {body}
+        </div>
+      ) : (
+        <form data-theme="light" noValidate onSubmit={submit} onChange={clearError} className={sheet}>
+          {body}
+        </form>
+      )}
+    </Saved>
+  );
+}
+
+function Banner() {
+  return (
+    <header className="relative overflow-hidden bg-linear-to-b from-white to-[#eef4fc] pb-8">
+      {/* navy diagonal panel with pylon, right side */}
+      <div
+        className="absolute inset-y-0 right-0 hidden w-[34%] bg-linear-to-r from-[#eef4fc] via-[#5b86c8] to-[#0b2c6e] md:block"
+        style={{ clipPath: "polygon(28% 0, 100% 0, 100% 100%, 0 100%)" }}
+        aria-hidden
+      />
+      <svg viewBox="0 0 120 200" className="absolute top-3 right-[200px] hidden h-[200px] text-[#13336f]/75 lg:block" aria-hidden>
+        <g stroke="currentColor" strokeWidth="2.2" fill="none">
+          <path d="M60 4 L36 196 M60 4 L84 196 M20 52 H100 M28 88 H92 M44 70 H76 M38 120 H82" />
+          <path d="M60 4 L44 70 L76 70 Z M44 70 L82 120 M76 70 L38 120 M38 120 L84 196 M82 120 L36 196" />
+          <path d="M20 52 l0 10 M100 52 l0 10 M28 88 l0 10 M92 88 l0 10" />
+        </g>
+      </svg>
+
+      <div className="relative grid items-center gap-3 px-4 pt-4 md:grid-cols-[200px_1fr_200px] md:px-6">
+        <Image
+          src="/logo.jpeg"
+          alt="Association of Junior Engineers Punjab logo"
+          width={200}
+          height={200}
+          priority
+          className="mx-auto size-[130px] rounded-full object-cover shadow-md ring-2 ring-white md:size-[196px]"
+        />
+        <div className="text-center" style={{ color: NAVY }}>
+          <h1 className="text-[28px] leading-[0.98] font-extrabold uppercase [font-stretch:78%] sm:text-[40px] lg:text-[54px]">
+            Association of
+            <br />
+            Junior Engineers Punjab
+          </h1>
+          <p className="mt-1 text-[20px] font-bold sm:text-[30px]">(PSPCL/PSTCL) Regd.</p>
+          <p className={`${script.className} mt-1 text-[20px] sm:text-[30px]`}>Together for a Stronger Tomorrow</p>
+        </div>
+        <div className="hidden text-center text-white md:block">
+          <p className="text-[26px] font-black tracking-wide [font-stretch:80%]">AOJE PUNJAB</p>
+          <p className="mt-3 text-[22px] leading-[1.15] font-black tracking-[0.14em] [font-stretch:80%]">
+            UNITY
+            <br />
+            SERVICE
+            <br />
+            PROGRESS
+          </p>
+        </div>
+      </div>
+
+      {/* swoosh */}
+      <svg viewBox="0 0 1200 60" preserveAspectRatio="none" className="absolute bottom-0 left-0 h-[44px] w-full" aria-hidden>
+        <path d="M0 26 Q 650 70 1200 0 V60 H0Z" fill="#6f9be0" opacity="0.55" />
+        <path d="M0 38 Q 700 72 1200 14 V60 H0Z" fill="#2f6fd6" />
+        <path d="M500 60 Q 900 52 1200 26 V60Z" fill="#f5b316" />
+        <path d="M0 50 Q 750 78 1200 38 V60 H0Z" fill="#f4f8fd" />
+      </svg>
+    </header>
+  );
+}
+
+const TONES = {
+  blue: { panel: "border-[#c6d9f1] bg-white", head: "from-[#cfe2fa] to-[#eef5fe] text-[#0b3a8a]", icon: "text-[#0b3a8a]" },
+  orange: { panel: "border-[#f6c98b] bg-[#fff8ef]", head: "from-[#fde1bb] to-[#fff4e6] text-[#2b2116]", icon: "text-[#ef8a1a]" },
+  green: { panel: "border-[#bfe0c3] bg-[#f3faf3]", head: "from-[#d5eed8] to-[#f1f9f1] text-[#1f2a21]", icon: "text-[#2f9a46]" },
+};
+
+function Panel({ tone = "blue", className = "", children }: { tone?: keyof typeof TONES; className?: string; children: React.ReactNode }) {
+  return <section className={`overflow-hidden rounded-md border ${TONES[tone].panel} ${className}`}>{children}</section>;
+}
+
+function Head({ n, title, small, note, icon: I, tone = "blue" }: { n: number; title: string; small?: string; note?: string; icon: Icon; tone?: keyof typeof TONES }) {
+  return (
+    <div className={`flex min-h-[34px] items-center gap-3 bg-linear-to-r px-3 ${TONES[tone].head}`}>
+      <I size={tone === "blue" ? 26 : 22} weight="fill" className={`shrink-0 ${TONES[tone].icon}`} />
+      <h3 className={`font-bold tracking-tight uppercase ${tone === "blue" ? "text-[17px]" : "text-[14.5px]"}`}>
+        {n}.&nbsp; {title} {small && <span className="text-[12.5px] font-medium normal-case">{small}</span>}
+      </h3>
+      {note && <span className="ml-auto rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium text-[#4a5a72]">{note}</span>}
     </div>
   );
 }
 
-function StepPanel({ index, step, children }: { index: number; step: number; children: React.ReactNode }) {
-  // Every step stays mounted (hidden) so all inputs are part of the final FormData.
+function Req() {
+  return <span className="text-[#e11d48]"> *</span>;
+}
+
+function Row({ label, req, htmlFor, className = "" }: { label: string; req?: boolean; htmlFor: string; className?: string }) {
   return (
-    <div data-step={index} hidden={index !== step}
-      className={index === step ? "step-in" : undefined}
-    >
+    <label htmlFor={htmlFor} className={`text-[15px] text-[#1b2638] ${className}`}>
+      {label}
+      {req && <Req />}
+    </label>
+  );
+}
+
+function Stack({ label, req, name, children }: { label: string; req?: boolean; name: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label htmlFor={name} className="mb-1.5 block text-[14.5px] font-medium text-[#1b2638]">
+        {label}
+        {req && <Req />}
+      </label>
       {children}
     </div>
   );
 }
 
-function FieldError({ msg }: { msg?: string[] }) {
-  return msg ? (
-    <p className="mt-1.5 flex items-center gap-1.5 text-sm text-danger">
-      <WarningCircle size={15} weight="fill" className="shrink-0" /> {msg[0]}
-    </p>
-  ) : null;
-}
-
-type FieldProps = {
-  label: string;
-  name: Name;
-  e: Errors;
-  icon?: Icon;
-  hint?: string;
-  textarea?: boolean;
-  className?: string;
-  "data-msg"?: string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "name" | "className">;
-
-function Field({ label, name, e, icon: Icon, hint, textarea, className, ...rest }: FieldProps) {
-  const pad = Icon ? "pl-10!" : "";
-  const common = { id: name, name, required: true, "aria-invalid": !!e[name] };
+function Info({ icon: I, title, req, children }: { icon: Icon; title: string; req?: boolean; children: React.ReactNode }) {
   return (
-    <div className={className}>
-      <label htmlFor={name} className="mb-2 block text-sm font-medium">
-        {label}
-      </label>
-      <div className="relative">
-        {Icon && <Icon size={18} className="pointer-events-none absolute top-3 left-3.5 text-muted" />}
-        {textarea ? (
-          <textarea rows={3} {...common} className={`field resize-none ${pad}`} />
-        ) : (
-          <input type="text" {...rest} {...common} className={`field ${pad}`} />
-        )}
+    <div className="flex gap-3 py-2.5">
+      <I size={28} weight="fill" className="mt-0.5 shrink-0" style={{ color: NAVY }} />
+      <div className="min-w-0 flex-1">
+        <p className="mb-1.5 text-[16px] font-bold" style={{ color: NAVY }}>
+          {title}
+          {req && <Req />}
+        </p>
+        {children}
       </div>
-      {e[name] ? <FieldError msg={e[name]} /> : hint ? <p className="mt-1.5 text-xs text-muted">{hint}</p> : null}
     </div>
   );
 }
 
-function Choice({
-  label,
-  name,
-  e,
-  options,
-  chips,
-  className = "",
-}: {
-  label: string;
+type TextProps = {
   name: Name;
   e: Errors;
-  options: { value: string; label: string; sub?: string; icon?: Icon }[];
-  chips?: boolean;
-  className?: string;
-}) {
+  textarea?: boolean;
+  "data-msg"?: string;
+  onChange?: (ev: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement> & React.TextareaHTMLAttributes<HTMLTextAreaElement>, "name" | "onChange">;
+
+function Text({ name, e, textarea, className = "", required = true, ...rest }: TextProps) {
+  const ctx = useContext(Saved);
+  const common = {
+    id: name,
+    name,
+    required,
+    readOnly: !!ctx?.locked,
+    defaultValue: rest.value === undefined ? (ctx?.values[name] ?? undefined) : undefined,
+    "aria-invalid": !!e[name],
+  };
   return (
-    <fieldset>
-      <legend className="mb-2 text-sm font-medium">{label}</legend>
-      <div className={chips ? "flex flex-wrap gap-2" : `grid gap-3 ${className}`}>
+    <div>
+      {textarea ? (
+        <textarea {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)} {...common} className={`${AREA} ${className}`} />
+      ) : (
+        <input type="text" {...(rest as React.InputHTMLAttributes<HTMLInputElement>)} {...common} className={`${INP} ${className}`} />
+      )}
+      <FieldError msg={e[name]} />
+    </div>
+  );
+}
+
+function Select({
+  e,
+  name,
+  invalid,
+  className = "",
+  required = true,
+  children,
+  ...rest
+}: { e?: Errors; name?: Name; invalid?: boolean } & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "name">) {
+  const ctx = useContext(Saved);
+  const caret = <CaretDown size={13} weight="bold" className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[#16233b]" />;
+  if (ctx?.locked) {
+    // Saved values may predate the current option lists, so show them as text.
+    const value = name ? ctx.values[name] : rest.value;
+    return (
+      <div className="relative">
+        <input readOnly id={rest.id ?? name} aria-label={rest["aria-label"]} value={String(value ?? "")} className={`${INP} pr-8 ${className}`} />
+        {caret}
+      </div>
+    );
+  }
+  return (
+    <div className="relative">
+      <select
+        id={rest.id ?? name}
+        name={name}
+        required={!!name && required}
+        aria-invalid={invalid || (!!name && !!e?.[name])}
+        {...rest}
+        {...(ctx && name && { defaultValue: ctx.values[name] ?? "" })}
+        className={`${INP} appearance-none pr-8 ${className}`}
+      >
+        {children}
+      </select>
+      {caret}
+      {name && <FieldError msg={e?.[name]} />}
+    </div>
+  );
+}
+
+function Choices({ name, e, options }: { name: Name; e: Errors; options: readonly string[] }) {
+  const ctx = useContext(Saved);
+  return (
+    <div>
+      <div className="flex min-h-[30px] flex-wrap items-center gap-x-5 gap-y-1.5">
         {options.map((o) => (
-          <label
-            key={o.value}
-            className={`group flex cursor-pointer items-center border transition has-checked:border-accent has-checked:bg-accent-soft has-focus-visible:ring-4 has-focus-visible:ring-accent/20 ${
-              e[name] ? "border-danger/60" : "border-line hover:border-ink/25"
-            } ${chips ? "rounded-full px-4 py-2 text-sm font-semibold" : "gap-3 rounded-xl p-4"}`}
-          >
-            <input type="radio" name={name} value={o.value} required className="sr-only" />
-            {o.icon && (
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-ink/[0.05] text-muted transition group-has-checked:bg-accent group-has-checked:text-on-accent">
-                <o.icon size={20} weight="duotone" />
-              </span>
-            )}
-            {chips ? (
-              <>
-                <Check size={14} weight="bold" className="mr-1.5 -ml-1 hidden text-accent group-has-checked:block" />
-                {o.label}
-              </>
-            ) : (
-              <>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">{o.label}</span>
-                  {o.sub && <span className="block text-xs text-muted">{o.sub}</span>}
-                </span>
-                <span className="grid size-5 shrink-0 place-items-center rounded-full border border-line text-transparent transition group-has-checked:border-accent group-has-checked:bg-accent group-has-checked:text-on-accent">
-                  <Check size={12} weight="bold" />
-                </span>
-              </>
-            )}
+          <label key={o} className="flex items-center gap-2 text-[14px] text-[#26344d]">
+            <input
+              type="radio"
+              name={name}
+              value={o}
+              required
+              disabled={!!ctx?.locked}
+              defaultChecked={ctx?.values[name] === o}
+              className="size-[16px] accent-[#0b2c6e]"
+            />
+            {o}
           </label>
         ))}
       </div>
       <FieldError msg={e[name]} />
-    </fieldset>
+    </div>
   );
+}
+
+function Radio({ name, label, checked }: { name: string; label: string; checked?: boolean }) {
+  return (
+    <label className="flex items-center gap-2 text-[#26344d]">
+      <input type="radio" name={name} defaultChecked={checked} className="size-[17px] accent-[#0b2c6e]" />
+      {label}
+    </label>
+  );
+}
+
+function MembershipNo({ value, className = "" }: { value?: string | null; className?: string }) {
+  return (
+    <span
+      title="Issued when your application is approved"
+      className={`rounded-md border border-[#c6d9f1] bg-white px-3 py-0.5 font-extrabold tracking-wide ${className}`}
+      style={{ color: NAVY }}
+    >
+      {value ?? "AOJE-____"}
+    </span>
+  );
+}
+
+function FieldError({ msg, center }: { msg?: string[]; center?: boolean }) {
+  return msg ? (
+    <p className={`mt-1 flex items-center gap-1 text-[12.5px] text-[#e11d48] ${center ? "justify-center text-center" : ""}`}>
+      <WarningCircle size={14} weight="fill" className="shrink-0" /> {msg[0]}
+    </p>
+  ) : null;
 }
 
 function Success({ refNo }: { refNo?: string }) {

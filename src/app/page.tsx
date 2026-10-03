@@ -188,7 +188,7 @@ export default function Home() {
                 ))}
               </div>
               <p className="mt-2.5 text-xs leading-relaxed">
-                Your membership <b>AOJ-0418</b> is approved. Log in with the password sent to your email.
+                Your membership <b>AOJE-0418</b> is approved. Log in with the password sent to your email.
               </p>
               <p className="mt-3 flex items-center gap-2">
                 <span className="grid size-7 place-items-center rounded-full bg-accent text-on-accent">
@@ -240,7 +240,7 @@ export default function Home() {
                   </span>
                   <p className="mt-3 text-xl font-semibold">Member</p>
                   <p className="text-sm font-semibold">
-                    AOJ-0418 <span className="text-xs font-normal text-muted">/membership no.</span>
+                    AOJE-0418 <span className="text-xs font-normal text-muted">/membership no.</span>
                   </p>
                   <div className="my-3 h-px bg-line" />
                   <p className="flex items-center gap-2 text-xs text-ink/80">

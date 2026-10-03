@@ -9,5 +9,5 @@ export function generatePassword(length = 10) {
   return out;
 }
 
-export const membershipNo = (n: number) => `AOJ-${String(n).padStart(4, "0")}`;
+export const membershipNo = (n: number) => `AOJE-${String(n).padStart(4, "0")}`;
 export const memberLoginId = (n: number) => `aoj${String(n).padStart(4, "0")}`;

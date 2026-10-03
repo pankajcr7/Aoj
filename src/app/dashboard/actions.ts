@@ -5,7 +5,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { applications, users } from "@/db/schema";
+import { applicationEdits, applications, users } from "@/db/schema";
+import { applicationSchema, fileOf, imageError, stringsOf } from "@/lib/application-schema";
+import type { FormErrors } from "@/app/register/actions";
 import { requireRole, STAFF } from "@/lib/auth";
 import { generatePassword, memberLoginId, membershipNo } from "@/lib/credentials";
 import { notify, type Delivery } from "@/lib/notify";
@@ -131,5 +133,50 @@ export async function changePassword(_: Result, formData: FormData): Promise<Res
   if (!row || !(await bcrypt.compare(current, row.hash))) return { error: "Current password is incorrect." };
 
   await db.update(users).set({ passwordHash: await bcrypt.hash(next, 12) }).where(eq(users.id, me.id));
+  return { ok: true };
+}
+
+export type EditResult = { ok?: boolean; message?: string; errors?: FormErrors };
+
+/** Master ID (admin) corrects a submitted form. Every changed field is logged to the audit trail. */
+export async function updateApplication(applicationId: string, formData: FormData): Promise<EditResult> {
+  const me = await requireRole(["admin"]);
+  const parsed = applicationSchema.safeParse(stringsOf(formData));
+  const photo = fileOf(formData, "photo");
+  const signature = fileOf(formData, "signature");
+  const errors: FormErrors = parsed.success ? {} : z.flattenError(parsed.error).fieldErrors;
+  if (photo && imageError(photo)) errors.photo = [imageError(photo)!];
+  if (signature && imageError(signature)) errors.signature = [imageError(signature)!];
+  if (!parsed.success || Object.keys(errors).length) return { errors, message: "Please fix the highlighted fields." };
+
+  const [current] = await db.select().from(applications).where(eq(applications.id, applicationId));
+  if (!current) return { message: "Application not found." };
+
+  const changed = Object.entries(parsed.data).filter(([k, v]) => (current[k as keyof typeof current] ?? "") !== (v ?? ""));
+  const remarks = String(formData.get("editRemarks") ?? "").trim().slice(0, 500) || null;
+  const log = (field: string, oldValue: string | null, newValue: string | null) =>
+    ({ applicationId, field, oldValue, newValue, remarks, changedBy: me.id });
+  const edits = changed.map(([k, v]) => log(k, (current[k as keyof typeof current] as string | null) ?? null, v ?? null));
+  if (photo) edits.push(log("photo", null, "New photo uploaded"));
+  if (signature) edits.push(log("signature", null, "New signature uploaded"));
+  if (!edits.length) return { message: "Nothing was changed." };
+
+  try {
+    await db.batch([
+      db
+        .update(applications)
+        .set({
+          ...Object.fromEntries(changed),
+          ...(photo && { photo: Buffer.from(await photo.arrayBuffer()), photoType: photo.type }),
+          ...(signature && { signature: Buffer.from(await signature.arrayBuffer()), signatureType: signature.type }),
+        })
+        .where(eq(applications.id, applicationId)),
+      db.insert(applicationEdits).values(edits),
+    ]);
+  } catch (e) {
+    if (isUnique(e)) return { errors: { employeeId: ["Another application already has this Employee ID"] } };
+    throw e;
+  }
+  refresh();
   return { ok: true };
 }

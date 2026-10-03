@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
   const rows = await db
     .select({
       membershipNo: a.membershipNo, status: a.status, name: a.name, fatherName: a.fatherName, dob: a.dob, designation: a.designation,
-      company: a.company, employeeId: a.employeeId, dojCompany: a.dojCompany, dojCompanyAs: a.dojCompanyAs, dojCurrentPost: a.dojCurrentPost,
+      company: a.company, employeeId: a.employeeId, membershipType: a.membershipType, posting: a.posting, headquarters: a.headquarters,
+      officeContact: a.officeContact, officialEmail: a.officialEmail, dojCompany: a.dojCompany, dojCompanyAs: a.dojCompanyAs, dojCurrentPost: a.dojCurrentPost,
       dojCurrentPostAs: a.dojCurrentPostAs, contact: a.contact, email: a.email, address: a.address, pinCode: a.pinCode, zone: a.zone,
       circle: a.circle, division: a.division, subDivision: a.subDivision, officeAddress: a.officeAddress, qualification: a.qualification,
       discipline: a.discipline, submitted: a.createdAt, reviewed: a.reviewedAt, rejectionReason: a.rejectionReason,
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
 
   const header = [
     "Membership No", "Status", "Name", "Father's Name", "Date of Birth", "Designation", "Organisation", "Employee ID",
+    "Membership Type", "Posting", "Headquarters", "Office Contact", "Official Email",
     "Joined Service", "Joined As", "Current Post Since", "Current Post", "Mobile", "Email", "Address", "Pin Code", "Zone",
     "Circle", "Division", "Sub Division", "Office Address", "Qualification", "Discipline", "Submitted", "Reviewed", "Rejection Reason",
   ];

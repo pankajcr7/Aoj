@@ -4,77 +4,50 @@ import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
+import { applicationSchema, type ApplicationField, fileOf, imageError, stringsOf } from "@/lib/application-schema";
 import { refFor } from "@/lib/messages";
 import { notify } from "@/lib/notify";
 
-const MAX_PHOTO = 500 * 1024;
-const PHOTO_TYPES = ["image/jpeg", "image/png"]; // what the PDF card can embed; the form converts other formats
-
-const text = z.string().trim().min(1, "Required").max(300);
-const pastDate = z.iso.date("Enter a valid date").refine((d) => new Date(d) <= new Date(), "Cannot be in the future");
-
-const schema = z.object({
-  name: text,
-  fatherName: text,
-  designation: text,
-  dob: pastDate,
-  address: text,
-  pinCode: z.string().regex(/^[1-9]\d{5}$/, "6-digit PIN code"),
-  company: z.enum(["PSPCL", "PSTCL"]),
-  dojCompany: pastDate,
-  dojCompanyAs: text,
-  dojCurrentPost: pastDate,
-  dojCurrentPostAs: text,
-  employeeId: text,
-  contact: z.string().regex(/^[6-9]\d{9}$/, "10-digit mobile number"),
-  email: z.email("Enter a valid email"),
-  zone: text,
-  circle: text,
-  division: text,
-  subDivision: text,
-  qualification: z.enum(["ITI", "Diploma", "BE", "B.Tech", "M.Tech"]),
-  discipline: z.enum(["Civil", "Electrical", "Mechanical"]),
-  officeAddress: text,
+const schema = applicationSchema.extend({
   declarationAccepted: z.literal("on", "You must accept the declaration"),
 });
+
+export type FormErrors = Partial<Record<ApplicationField | "declarationAccepted" | "photo" | "signature", string[]>>;
 
 export type RegisterState = {
   ok?: boolean;
   ref?: string;
   message?: string;
-  errors?: Partial<Record<keyof z.infer<typeof schema> | "photo", string[]>>;
+  errors?: FormErrors;
 };
 
 export async function register(_: RegisterState, formData: FormData): Promise<RegisterState> {
-  const raw = Object.fromEntries([...formData].filter(([, v]) => typeof v === "string")) as Record<string, string>;
-  const parsed = schema.safeParse(raw);
-  const photo = formData.get("photo");
+  const parsed = schema.safeParse(stringsOf(formData));
+  const photo = fileOf(formData, "photo");
+  const signature = fileOf(formData, "signature");
 
-  const photoError =
-    !(photo instanceof File) || photo.size === 0
-      ? "Passport-size photo is required"
-      : !PHOTO_TYPES.includes(photo.type)
-        ? "Use a JPG or PNG image"
-        : photo.size > MAX_PHOTO
-          ? "Photo must be under 500 KB"
-          : null;
+  const photoError = photo ? imageError(photo) : "Passport-size photo is required";
+  const signatureError = signature && imageError(signature);
 
-  if (!parsed.success || photoError) {
-    const errors: RegisterState["errors"] = parsed.success ? {} : z.flattenError(parsed.error).fieldErrors;
+  if (!parsed.success || photoError || signatureError) {
+    const errors: FormErrors = parsed.success ? {} : z.flattenError(parsed.error).fieldErrors;
     if (photoError) errors.photo = [photoError];
+    if (signatureError) errors.signature = [signatureError];
     return { errors, message: "Please fix the highlighted fields." };
   }
 
-  const file = photo as File;
+  const { declarationAccepted, ...fields } = parsed.data;
+  void declarationAccepted;
   let id: string;
   try {
     [{ id }] = await db
       .insert(applications)
       .values({
-        ...parsed.data,
+        ...fields,
         declarationAccepted: true,
-        photo: Buffer.from(await file.arrayBuffer()),
-        photoType: file.type,
+        photo: Buffer.from(await photo!.arrayBuffer()),
+        photoType: photo!.type,
+        ...(signature && { signature: Buffer.from(await signature.arrayBuffer()), signatureType: signature.type }),
       })
       .returning({ id: applications.id });
   } catch (e) {

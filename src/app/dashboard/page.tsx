@@ -113,7 +113,7 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
           company: applications.company, employeeId: applications.employeeId, membershipNo: applications.membershipNo,
           zone: applications.zone, circle: applications.circle, division: applications.division, subDivision: applications.subDivision,
           contact: applications.contact, email: applications.email, reviewedAt: applications.reviewedAt, qualification: applications.qualification,
-          discipline: applications.discipline,
+          discipline: applications.discipline, posting: applications.posting, headquarters: applications.headquarters,
         })
         .from(applications)
         .where(eq(applications.id, applicationId))
@@ -163,7 +163,9 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
             <Detail label="Qualification" value={`${a.qualification} (${a.discipline})`} />
             <Detail label="Zone" value={a.zone} />
             <Detail label="Division" value={a.division} />
-            <Detail label="Sub Division" value={a.subDivision} wide />
+            <Detail label="Sub Division" value={a.subDivision} />
+            <Detail label="Headquarters" value={a.headquarters} />
+            <Detail label="Posting" value={a.posting} wide />
           </dl>
           <p className="mt-6 rounded-lg bg-ink/[0.04] p-3 text-sm text-muted">
             To correct any detail, please contact the Operation Team. You can change your password from{" "}

@@ -12,7 +12,7 @@ import {
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
-// Membership numbers: AOJ-0001, AOJ-0002, ...
+// Membership numbers: AOJE-0001, AOJE-0002, ... (issued in order on approval)
 export const membershipSeq = pgSequence("membership_seq", { startWith: 1 });
 
 export const role = pgEnum("role", ["admin", "operations", "member"]);
@@ -47,9 +47,18 @@ export const applications = pgTable("applications", {
   officeAddress: text().notNull(),
   declarationAccepted: boolean().notNull(),
 
+  // Added with the new form layout (nullable: earlier applications don't have them)
+  posting: text(),
+  headquarters: text(),
+  officeContact: text(),
+  officialEmail: text(),
+  membershipType: text(),
+
   // ponytail: photo stored in Postgres (capped at 500 KB); move to object storage if volume grows
   photo: bytea().notNull(),
   photoType: text().notNull(),
+  signature: bytea(),
+  signatureType: text(),
 
   // "For office use only"
   membershipNo: text().unique(),
@@ -85,5 +94,21 @@ export const notifications = pgTable("notifications", {
   status: notifyStatus().notNull(),
   recipient: text().notNull(),
   error: text(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+// Corrections made by the Master ID (admin) after submission; shown as the audit trail.
+export const applicationEdits = pgTable("application_edits", {
+  id: uuid().primaryKey().defaultRandom(),
+  applicationId: uuid()
+    .notNull()
+    .references(() => applications.id),
+  field: text().notNull(),
+  oldValue: text(),
+  newValue: text(),
+  remarks: text(),
+  changedBy: uuid()
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

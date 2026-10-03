@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
@@ -17,13 +19,20 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/card/[id]">) {
     .select({
       name: a.name, fatherName: a.fatherName, designation: a.designation, company: a.company, employeeId: a.employeeId,
       membershipNo: a.membershipNo, reviewedAt: a.reviewedAt, circle: a.circle, zone: a.zone, contact: a.contact,
-      photo: a.photo, photoType: a.photoType,
+      photo: a.photo, photoType: a.photoType, signature: a.signature, signatureType: a.signatureType,
     })
     .from(a)
     .where(and(eq(a.id, id), eq(a.status, "approved")));
   if (!m?.membershipNo) return new Response("Not found", { status: 404 });
 
-  const pdf = await membershipCardPdf({ ...m, membershipNo: m.membershipNo, memberSince: fmtDate(m.reviewedAt), photo: new Uint8Array(m.photo) });
+  const pdf = await membershipCardPdf({
+    ...m,
+    membershipNo: m.membershipNo,
+    memberSince: fmtDate(m.reviewedAt),
+    photo: new Uint8Array(m.photo),
+    signature: m.signature && new Uint8Array(m.signature),
+    logo: await readFile(join(process.cwd(), "public/logo.jpeg")),
+  });
   return new Response(pdf as BodyInit, {
     headers: {
       "Content-Type": "application/pdf",

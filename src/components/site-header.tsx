@@ -1,11 +1,12 @@
-import { CaretDown, Lightning } from "@phosphor-icons/react/ssr";
+import { CaretDown } from "@phosphor-icons/react/ssr";
+import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-1.5" aria-label="Association of Junior Engineers, Punjab home">
-      <Lightning size={26} weight="fill" className="text-accent" />
+    <Link href="/" className="flex items-center gap-2" aria-label="Association of Junior Engineers, Punjab home">
+      <Image src="/logo.jpeg" alt="" width={40} height={40} className="size-10 rounded-full object-cover" />
       <span className="text-lg font-semibold tracking-tight">
         AOJ<span className="font-normal">Punjab</span>
       </span>
