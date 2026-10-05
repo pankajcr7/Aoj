@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Archivo } from "next/font/google";
+import { DM_Sans, Geist_Mono, Quicksand } from "next/font/google";
 import "./globals.css";
 
-const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], axes: ["wdth"] });
+const quicksand = Quicksand({ variable: "--font-quicksand", subsets: ["latin"] });
+const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Association of Junior Engineers, Punjab | Patiala",
@@ -16,7 +18,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem("theme");if(t===
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationWarning className={`${archivo.variable} h-full antialiased`}>
+    <html lang="en" data-theme="light" suppressHydrationWarning className={`${quicksand.variable} ${dmSans.variable} ${geistMono.variable} h-full antialiased`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

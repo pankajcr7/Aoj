@@ -51,7 +51,7 @@ async function StaffHome({ isAdmin }: { isAdmin: boolean }) {
         <section className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-5 py-4">
             <h2 className="font-semibold">Needs review</h2>
-            <Link href="/dashboard/applications" className="text-sm font-semibold text-accent hover:underline">
+            <Link href="/dashboard/applications" className="text-sm font-medium text-ink underline underline-offset-4 hover:no-underline">
               View all
             </Link>
           </div>
@@ -60,7 +60,7 @@ async function StaffHome({ isAdmin }: { isAdmin: boolean }) {
               {queue.map((a) => (
                 <li key={a.id}>
                   <Link href={`/dashboard/applications/${a.id}`} className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-ink/[0.03]">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-sm font-bold uppercase">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface-2 text-sm font-mono font-medium uppercase">
                       {a.name.slice(0, 2)}
                     </span>
                     <span className="min-w-0 flex-1">
@@ -90,8 +90,8 @@ async function StaffHome({ isAdmin }: { isAdmin: boolean }) {
                     <span className="truncate">{z.zone}</span>
                     <span className="font-semibold tabular-nums">{z.n}</span>
                   </div>
-                  <div className="mt-1.5 h-2 rounded-full bg-ink/[0.06]">
-                    <div className="h-full rounded-full bg-accent" style={{ width: `${(z.n / maxZone) * 100}%` }} />
+                  <div className="mt-1.5 h-1.5 rounded-sm bg-surface-2">
+                    <div className="h-full rounded-sm bg-ink/80" style={{ width: `${(z.n / maxZone) * 100}%` }} />
                   </div>
                 </li>
               ))}
@@ -131,19 +131,18 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         {/* Member card */}
         <div className="card relative overflow-hidden p-6">
-          <div className="absolute -top-20 -right-20 size-56 rounded-full bg-accent/15 blur-3xl" aria-hidden />
           <div className="relative flex items-center justify-between">
-            <span className="text-sm font-semibold">AOJ Punjab</span>
+            <span className="eyebrow">AOJE Punjab</span>
             <StatusBadge status="approved" />
           </div>
           <div className="relative mt-6 flex gap-4">
             {/* eslint-disable-next-line @next/next/no-img-element -- auth-protected photo route */}
             <img src={`/api/photo/${a.id}`} alt={`${a.name}'s photo`} className="h-28 w-22 rounded-xl border border-line object-cover" />
             <div className="min-w-0">
-              <p className="truncate text-xl font-semibold">{a.name}</p>
+              <p className="truncate font-display text-2xl font-bold tracking-tight">{a.name}</p>
               <p className="text-sm text-muted">{a.designation}</p>
               <p className="mt-3 text-xs text-muted">Membership No.</p>
-              <p className="font-mono text-lg font-semibold text-accent">{a.membershipNo}</p>
+              <p className="font-mono text-lg font-medium">{a.membershipNo}</p>
             </div>
           </div>
           <dl className="relative mt-6 grid grid-cols-2 gap-3 border-t border-line pt-4">
@@ -167,9 +166,9 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
             <Detail label="Headquarters" value={a.headquarters} />
             <Detail label="Posting" value={a.posting} wide />
           </dl>
-          <p className="mt-6 rounded-lg bg-ink/[0.04] p-3 text-sm text-muted">
+          <p className="mt-6 rounded-md bg-surface-2 p-3 text-sm text-muted">
             To correct any detail, please contact the Operation Team. You can change your password from{" "}
-            <Link href="/dashboard/account" className="font-semibold text-accent hover:underline">
+            <Link href="/dashboard/account" className="font-medium text-ink underline underline-offset-4 hover:no-underline">
               Account
             </Link>
             .

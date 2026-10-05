@@ -13,9 +13,9 @@ export function ThemeToggle() {
   }
 
   return (
-    <button onClick={toggle} aria-label="Switch between light and dark mode" className="btn-outline size-10 p-0">
-      <Sun size={18} weight="bold" className="light:hidden" />
-      <Moon size={18} weight="bold" className="hidden light:block" />
+    <button onClick={toggle} aria-label="Switch between light and dark mode" className="btn-outline size-9 rounded-full p-0">
+      <Sun size={16} weight="bold" className="light:hidden" />
+      <Moon size={16} weight="bold" className="hidden light:block" />
     </button>
   );
 }

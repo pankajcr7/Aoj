@@ -32,6 +32,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/card/[id]">) {
     photo: new Uint8Array(m.photo),
     signature: m.signature && new Uint8Array(m.signature),
     logo: await readFile(join(process.cwd(), "public/logo.jpeg")),
+    authoritySign: await readFile(join(process.cwd(), "public/General-Secretary-Sign.png")).catch(() => null),
   });
   return new Response(pdf as BodyInit, {
     headers: {

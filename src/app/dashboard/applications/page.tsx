@@ -75,7 +75,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/das
         {rows.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="border-b border-line text-left text-xs text-muted">
+              <thead className="border-b border-line text-left font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
                 <tr>
                   <th className="px-5 py-3 font-medium">Applicant</th>
                   <th className="px-5 py-3 font-medium">Organisation</th>
@@ -90,7 +90,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/das
                   <tr key={a.id} className="group transition hover:bg-ink/[0.03]">
                     <td className="px-5 py-3.5">
                       <Link href={`/dashboard/applications/${a.id}`} className="flex items-center gap-3">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-xs font-bold uppercase">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-surface-2 text-xs font-mono font-medium uppercase">
                           {a.name.slice(0, 2)}
                         </span>
                         <span>
@@ -109,7 +109,7 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/das
                       <StatusBadge status={a.status} />
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <Link href={`/dashboard/applications/${a.id}`} className="inline-flex items-center gap-1 font-semibold text-accent">
+                      <Link href={`/dashboard/applications/${a.id}`} className="inline-flex items-center gap-1 font-medium text-ink hover:underline underline-offset-4">
                         {a.status === "pending" ? "Review" : "View"} <ArrowRight size={14} weight="bold" />
                       </Link>
                     </td>

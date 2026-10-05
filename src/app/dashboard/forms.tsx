@@ -9,6 +9,7 @@ import {
   rejectApplication,
   resetPassword,
   setActive,
+  setMembershipStatus,
   type Credentials,
   type Result,
 } from "./actions";
@@ -153,7 +154,7 @@ export function ReviewPanel({ applicationId, pending }: { applicationId: string;
 }
 
 /** Admin controls for any account: reset password, turn on/off. */
-export function AccountControls({ userId, active, isSelf }: { userId: string; active: boolean; isSelf?: boolean }) {
+export function AccountControls({ userId, active, noToggle }: { userId: string; active: boolean; noToggle?: boolean }) {
   const [creds, reset, resetting] = useActionState(() => resetPassword(userId), {} as Credentials);
   return (
     <div className="space-y-3">
@@ -163,7 +164,7 @@ export function AccountControls({ userId, active, isSelf }: { userId: string; ac
             <ArrowClockwise size={14} weight="bold" /> {resetting ? "Resetting…" : "Reset password"}
           </button>
         </form>
-        {!isSelf && (
+        {!noToggle && (
           <form action={setActive.bind(null, userId, !active)}>
             <button className={`btn-outline px-3 py-2 text-xs ${active ? "text-danger" : "text-accent"}`}>
               <Power size={14} weight="bold" /> {active ? "Turn off" : "Turn on"}
@@ -174,6 +175,46 @@ export function AccountControls({ userId, active, isSelf }: { userId: string; ac
       <SecretBox title="New password issued" creds={creds} />
       <Alert msg={creds.error} />
     </div>
+  );
+}
+
+const MOVES = {
+  approved: [["suspended", "Suspend"], ["terminated", "Terminate"]],
+  suspended: [["approved", "Reactivate"], ["terminated", "Terminate"]],
+  terminated: [["approved", "Reactivate"]],
+} as const;
+
+/** Master ID: suspend / terminate / reactivate. The member's login follows the status. */
+export function MembershipControls({ applicationId, status }: { applicationId: string; status: keyof typeof MOVES }) {
+  const [state, action, pending] = useActionState(setMembershipStatus.bind(null, applicationId), {} as Result);
+  return (
+    <form action={action} className="space-y-3" key={status}>
+      <label htmlFor="remarks" className="block text-sm font-medium">
+        Reason / authority
+      </label>
+      <textarea
+        id="remarks"
+        name="remarks"
+        rows={2}
+        required
+        className="field resize-none"
+        placeholder="e.g. Misconduct, as decided by the State Committee on 05-10-2026"
+      />
+      <div className="flex flex-wrap gap-2">
+        {MOVES[status].map(([to, label]) => (
+          <button
+            key={to}
+            name="to"
+            value={to}
+            disabled={pending}
+            className={`btn-outline px-3 py-2 text-xs ${to === "approved" ? "text-accent" : "text-danger"}`}
+          >
+            <Power size={14} weight="bold" /> {label}
+          </button>
+        ))}
+      </div>
+      <Alert msg={state.error} />
+    </form>
   );
 }
 

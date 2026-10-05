@@ -21,7 +21,7 @@ export default async function StaffPage() {
           {staff.map((s) => (
             <div key={s.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-center gap-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink/[0.06] text-sm font-bold uppercase">{s.loginId.slice(0, 2)}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-full border border-line bg-surface-2 text-sm font-mono font-medium uppercase">{s.loginId.slice(0, 2)}</span>
                 <div>
                   <p className="font-semibold">
                     {s.loginId} {s.id === me.id && <span className="text-xs font-normal text-muted">(you)</span>}
@@ -33,7 +33,7 @@ export default async function StaffPage() {
                 </div>
               </div>
               <div className="sm:max-w-xs">
-                <AccountControls userId={s.id} active={s.active} isSelf={s.id === me.id} />
+                <AccountControls userId={s.id} active={s.active} noToggle={s.id === me.id} />
               </div>
             </div>
           ))}

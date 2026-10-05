@@ -1,11 +1,11 @@
 import { ArrowRight, CaretLeft, CaretRight, DownloadSimple, IdentificationCard, MagnifyingGlass, UsersThree } from "@phosphor-icons/react/ssr";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
 import { applications, users } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { searchFilter } from "../queries";
-import { EmptyState, fmtDate, PageHeader } from "../ui";
+import { EmptyState, fmtDate, PageHeader, StatusBadge } from "../ui";
 
 const PAGE_SIZE = 25;
 
@@ -19,11 +19,11 @@ export default async function MembersPage({ searchParams }: PageProps<"/dashboar
     .select({
       id: applications.id, membershipNo: applications.membershipNo, name: applications.name, employeeId: applications.employeeId,
       company: applications.company, zone: applications.zone, circle: applications.circle, contact: applications.contact,
-      approvedAt: applications.reviewedAt, loginId: users.loginId, active: users.active,
+      approvedAt: applications.reviewedAt, loginId: users.loginId, status: applications.status,
     })
     .from(applications)
     .leftJoin(users, eq(users.applicationId, applications.id))
-    .where(and(eq(applications.status, "approved"), searchFilter(q)))
+    .where(and(inArray(applications.status, ["approved", "suspended", "terminated"]), searchFilter(q)))
     .orderBy(desc(applications.reviewedAt))
     .limit(PAGE_SIZE + 1)
     .offset(page * PAGE_SIZE);
@@ -32,7 +32,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/dashboar
 
   return (
     <>
-      <PageHeader title="Members" desc="All approved members of the association.">
+      <PageHeader title="Members" desc="All members of the association: active, suspended and terminated.">
         <a href={`/api/export?status=approved${q ? `&q=${encodeURIComponent(q)}` : ""}`} className="btn-outline">
           <DownloadSimple size={16} weight="bold" /> Export CSV
         </a>
@@ -47,21 +47,21 @@ export default async function MembersPage({ searchParams }: PageProps<"/dashboar
         {rows.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
-              <thead className="border-b border-line text-left text-xs text-muted">
+              <thead className="border-b border-line text-left font-mono text-[11px] tracking-[0.06em] text-muted uppercase">
                 <tr>
                   <th className="px-5 py-3 font-medium">Membership No.</th>
                   <th className="px-5 py-3 font-medium">Member</th>
                   <th className="px-5 py-3 font-medium">Posting</th>
                   <th className="px-5 py-3 font-medium">Mobile</th>
                   <th className="px-5 py-3 font-medium">Member since</th>
-                  <th className="px-5 py-3 font-medium">Account</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.slice(0, PAGE_SIZE).map((m) => (
                   <tr key={m.id} className="transition hover:bg-ink/[0.03]">
-                    <td className="px-5 py-3.5 font-mono font-semibold text-accent">{m.membershipNo}</td>
+                    <td className="px-5 py-3.5 font-mono font-medium">{m.membershipNo}</td>
                     <td className="px-5 py-3.5">
                       <span className="block font-semibold">{m.name}</span>
                       <span className="block text-xs text-muted">
@@ -75,14 +75,14 @@ export default async function MembersPage({ searchParams }: PageProps<"/dashboar
                     <td className="px-5 py-3.5">{m.contact}</td>
                     <td className="px-5 py-3.5 text-muted">{fmtDate(m.approvedAt)}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-xs font-semibold ${m.active ? "text-accent" : "text-danger"}`}>{m.active ? "Active" : "Turned off"}</span>
+                      {m.status === "approved" ? <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium tracking-[0.05em] text-accent uppercase">Active</span> : <StatusBadge status={m.status} />}
                       <span className="block font-mono text-xs text-muted">{m.loginId}</span>
                     </td>
                     <td className="px-5 py-3.5 text-right whitespace-nowrap">
                       <a href={`/api/card/${m.id}`} target="_blank" rel="noopener" className="mr-4 inline-flex items-center gap-1 font-semibold text-muted hover:text-ink">
                         <IdentificationCard size={15} weight="bold" /> Card
                       </a>
-                      <Link href={`/dashboard/applications/${m.id}`} className="inline-flex items-center gap-1 font-semibold text-accent">
+                      <Link href={`/dashboard/applications/${m.id}`} className="inline-flex items-center gap-1 font-medium text-ink hover:underline underline-offset-4">
                         Manage <ArrowRight size={14} weight="bold" />
                       </Link>
                     </td>

@@ -1,83 +1,71 @@
 @import "tailwindcss";
 
 /*
-  Theme: light by default, dark via <html data-theme="dark"> (toggle in header, saved to localStorage).
-  One lime accent. Radius rule: buttons and inputs = rounded-lg, cards = rounded-2xl, pills = rounded-full.
+  Theme: amber + charcoal on white, light by default, dark via <html data-theme="dark"> (toggle saved to localStorage).
+  Motif: slanted parallelogram panels (.slant). Buttons are pills; cards rounded-2xl; inputs rounded-lg.
+  --accent stays a muted green and means "success"; --brand (amber) is decoration and highlights.
 */
 @custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --canvas: #f4f7f3;
+  --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-2: #edf2ec;
-  --tint: #e6f4d6;
-  --tint-2: #f3f9ec;
-  --ink: #0e1a14;
-  --muted: #56675e;
-  --line: rgb(14 26 20 / 0.1);
-  --accent: #3f7a0c;
-  --accent-soft: rgb(99 160 30 / 0.12);
+  --surface-2: #f5f5f4;
+  --ink: #2b2b2b;
+  --muted: #6b6b6b;
+  --line: #ebebeb;
+  --brand: #f6a821;
+  --night: #2e2e2e;
+  --violet: #8b89f2;
+  --accent: #2f7a3b;
+  --accent-soft: #e9f4ea;
   --on-accent: #ffffff;
-  --danger: #c4320a;
-  --ok: #15803d;
-  --glow-1: rgb(168 226 94 / 0.3);
-  --glow-2: rgb(110 231 183 / 0.2);
-  --card-from: #ffffff;
-  --card-to: #fbfcfa;
-  --card-shadow: 0 1px 2px rgb(14 26 20 / 0.04), 0 12px 32px -16px rgb(14 26 20 / 0.14);
+  --danger: #b8322a;
+  --warn: #a86a00;
+  --ok: #2f7a3b;
   --field-bg: #ffffff;
-  --wave-top: #dbe8d3;
-  --wave-mid: #ecf2e9;
-  --rim-a: #6fb52f;
-  --rim-b: #10b981;
-  --rim-c: #0891b2;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0a1018;
-  --surface: #111a24;
-  --surface-2: #17222e;
-  --tint: #15302a;
-  --tint-2: #12201a;
-  --ink: #f2f5f7;
-  --muted: #94a1ae;
+  --canvas: #19191b;
+  --surface: #212123;
+  --surface-2: #29292b;
+  --ink: #f1f1f0;
+  --muted: #a3a3a0;
   --line: rgb(255 255 255 / 0.08);
-  --accent: #a8e25e;
-  --accent-soft: rgb(168 226 94 / 0.1);
-  --on-accent: #0d1a06;
-  --danger: #ff7a6b;
-  --ok: #7ee2a1;
-  --glow-1: rgb(34 94 64 / 0.28);
-  --glow-2: rgb(34 94 64 / 0.18);
-  --card-from: rgb(255 255 255 / 0.05);
-  --card-to: rgb(255 255 255 / 0.015);
-  --card-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --brand: #f6a821;
+  --night: #0f0f10;
+  --violet: #8b89f2;
+  --accent: #8fd19e;
+  --accent-soft: rgb(143 209 158 / 0.12);
+  --on-accent: #111111;
+  --danger: #ef8f88;
+  --warn: #f2bd57;
+  --ok: #8fd19e;
   --field-bg: rgb(255 255 255 / 0.03);
-  --wave-top: #2a3a4a;
-  --wave-mid: #141e29;
-  --rim-a: #a8e25e;
-  --rim-b: #6ee7b7;
-  --rim-c: #67e8f9;
 }
 
 @theme inline {
-  --font-display: var(--font-archivo);
-  --font-sans: var(--font-archivo);
+  --font-display: var(--font-quicksand);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-geist-mono);
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --color-tint: var(--tint);
-  --color-tint-2: var(--tint-2);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-night: var(--night);
+  --color-violet: var(--violet);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
   --color-danger: var(--danger);
+  --color-warn: var(--warn);
   --color-ok: var(--ok);
 }
 
@@ -86,58 +74,65 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(60rem 40rem at 110% -10%, var(--glow-1), transparent 60%),
-    radial-gradient(50rem 40rem at -20% 30%, var(--glow-2), transparent 60%),
-    var(--canvas);
-  background-repeat: no-repeat;
+  background: var(--canvas);
   color: var(--ink);
+  line-height: 1.6;
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--ink);
+  color: var(--canvas);
 }
 
-/* Glass card used across the site */
 @utility card {
-  @apply rounded-2xl border border-line;
-  background: linear-gradient(var(--card-from), var(--card-to));
-  box-shadow: var(--card-shadow);
+  @apply rounded-2xl border border-line bg-surface;
 }
 
 @utility field {
   @apply w-full rounded-lg border border-line px-3.5 py-2.5 text-[15px] text-ink outline-none transition duration-200
-    placeholder:text-muted/70 focus:border-accent/60 focus:ring-4 focus:ring-accent/15
+    placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/20
     aria-invalid:border-danger aria-invalid:ring-4 aria-invalid:ring-danger/10;
   background-color: var(--field-bg);
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold whitespace-nowrap
     transition duration-200 ease-out active:scale-[0.98]
-    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-60;
+    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:pointer-events-none disabled:opacity-60;
 }
 
-/* Lime button keeps dark text in both themes */
+/* Primary action: dark pill (light pill in dark mode) */
 @utility btn-accent {
-  @apply btn bg-linear-to-b from-[#c4f283] to-[#8fd14f] text-[#0d1a06] shadow-[0_0_28px_-8px_#a8e25e,inset_0_1px_0_rgb(255_255_255/0.4)] hover:brightness-105;
+  @apply btn bg-ink text-canvas hover:bg-ink/85;
+}
+
+/* Amber pill, for dark panels */
+@utility btn-brand {
+  @apply btn bg-brand text-[#2b2b2b] hover:brightness-105;
 }
 
 @utility btn-outline {
-  @apply btn border border-line bg-ink/[0.04] text-ink hover:bg-ink/[0.08];
+  @apply btn border border-line bg-surface text-ink hover:bg-surface-2;
+}
+
+/* Small uppercase label */
+@utility eyebrow {
+  @apply text-[11px] font-semibold tracking-[0.14em] text-muted uppercase;
+}
+
+/* The slanted parallelogram used for panels, tiles and photo frames */
+@utility slant {
+  clip-path: polygon(16% 0, 100% 0, 84% 100%, 0 100%);
+}
+@utility slant-soft {
+  clip-path: polygon(9% 0, 100% 0, 91% 100%, 0 100%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(16px);
-    }
-  }
-  @keyframes drift {
-    50% {
-      transform: translateY(-10px) scaleY(1.04);
+      transform: translateY(12px);
     }
   }
   @keyframes step-in {
@@ -147,12 +142,8 @@ body {
     }
   }
   .rise {
-    animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--i, 0) * 90ms);
-  }
-  .drift {
-    animation: drift 9s ease-in-out infinite;
-    transform-origin: bottom;
+    animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--i, 0) * 80ms);
   }
   .step-in {
     animation: step-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;

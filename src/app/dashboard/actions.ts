@@ -136,6 +136,37 @@ export async function changePassword(_: Result, formData: FormData): Promise<Res
   return { ok: true };
 }
 
+// Membership lifecycle after approval. "approved" = active member.
+const MOVES = { suspended: ["approved"], terminated: ["approved", "suspended"], approved: ["suspended", "terminated"] } as const;
+const MEMBERSHIP_LABEL = { approved: "Active", suspended: "Suspended", terminated: "Terminated" } as const;
+
+/** Master ID (admin): suspend, terminate or reactivate a member. Login follows the status; every move is audited. */
+export async function setMembershipStatus(applicationId: string, _: Result, formData: FormData): Promise<Result> {
+  const me = await requireRole(["admin"]);
+  const to = String(formData.get("to")) as keyof typeof MOVES;
+  if (!(to in MOVES)) return { error: "Unknown action." };
+  const remarks = String(formData.get("remarks") ?? "").trim().slice(0, 500);
+  if (remarks.length < 5) return { error: "Please record the reason / authority (at least 5 characters)." };
+
+  const [cur] = await db.select({ status: applications.status }).from(applications).where(eq(applications.id, applicationId));
+  const from = cur?.status as keyof typeof MEMBERSHIP_LABEL;
+  if (!(MOVES[to] as readonly string[]).includes(from)) return { error: "This member's status has changed. Please reload." };
+
+  // One statement = atomic, and guarded on the status just read.
+  const done = await db.execute(sql`
+    with upd as (
+      update applications set status = ${to} where id = ${applicationId} and status = ${from} returning id
+    ), acct as (
+      update users set active = ${to === "approved"} where application_id in (select id from upd)
+    )
+    insert into application_edits (application_id, field, old_value, new_value, remarks, changed_by)
+    select id, 'Membership Status', ${MEMBERSHIP_LABEL[from]}, ${MEMBERSHIP_LABEL[to]}, ${remarks}, ${me.id} from upd
+    returning id`);
+  if (!done.rows.length) return { error: "This member's status has changed. Please reload." };
+  refresh();
+  return { ok: true };
+}
+
 export type EditResult = { ok?: boolean; message?: string; errors?: FormErrors };
 
 /** Master ID (admin) corrects a submitted form. Every changed field is logged to the audit trail. */

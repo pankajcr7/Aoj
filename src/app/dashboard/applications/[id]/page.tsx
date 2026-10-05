@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { applicationEdits, applications, notifications, users } from "@/db/schema";
 import { FIELD_LABELS } from "@/lib/application-schema";
 import { requireRole, STAFF } from "@/lib/auth";
-import { AccountControls, ReviewPanel } from "../../forms";
+import { AccountControls, MembershipControls, ReviewPanel } from "../../forms";
 import { StatusBadge } from "../../ui";
 
 const reviewer = alias(users, "reviewer");
@@ -50,8 +50,11 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
   );
   values.reviewer = reviewerId;
   values.loginId = member?.loginId ?? null;
+  // Suspended / terminated: show the latest recorded reason in the remarks box.
+  if (a.status === "suspended" || a.status === "terminated")
+    values.rejectionReason = edits.findLast((ed) => ed.field === "Membership Status")?.remarks ?? null;
   const events: [Date, string, string][] = [[a.createdAt, "Application submitted", a.name]];
-  if (a.reviewedAt) events.push([a.reviewedAt, a.status === "approved" ? "Approved" : "Rejected", reviewerId ?? "-"]);
+  if (a.reviewedAt) events.push([a.reviewedAt, a.status === "rejected" ? "Rejected" : "Approved", reviewerId ?? "-"]);
   for (const ed of edits) {
     const label = FIELD_LABELS[ed.field as keyof typeof FIELD_LABELS] ?? ed.field;
     const change = ed.oldValue === null ? ed.newValue : `${ed.oldValue || "(empty)"} → ${ed.newValue || "(empty)"}`;
@@ -75,17 +78,16 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
             {/* Always mounted so freshly issued credentials survive the refresh after approval. */}
             <ReviewPanel applicationId={a.id} pending={a.status === "pending"} />
             {a.status === "approved" && (
-              <>
-                <a href={`/api/card/${a.id}`} target="_blank" rel="noopener" className="btn-outline w-full py-2.5">
+              <a href={`/api/card/${a.id}`} target="_blank" rel="noopener" className="btn-outline w-full py-2.5">
                   <IdentificationCard size={18} weight="bold" /> Membership Card (PDF)
                 </a>
-                {me.role === "admin" && member?.id && (
-                  <div>
-                    <p className="mb-3 text-sm font-medium">Member account</p>
-                    <AccountControls userId={member.id} active={member.active} />
-                  </div>
-                )}
-              </>
+            )}
+            {me.role === "admin" && (a.status === "approved" || a.status === "suspended" || a.status === "terminated") && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Membership (Master ID)</p>
+                <MembershipControls applicationId={a.id} status={a.status} />
+                {member?.id && a.status === "approved" && <AccountControls userId={member.id} active={member.active} noToggle />}
+              </div>
             )}
           </div>
         }

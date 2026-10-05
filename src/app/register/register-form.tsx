@@ -19,7 +19,7 @@ import {
   WarningCircle,
   type Icon,
 } from "@phosphor-icons/react";
-import { Kaushan_Script } from "next/font/google";
+import { Archivo, Kaushan_Script } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,8 @@ import { updateApplication } from "@/app/dashboard/actions";
 import { register, type FormErrors } from "./actions";
 
 const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
+// The form keeps its original paper-form look (and font), independent of the site theme.
+const archivo = Archivo({ subsets: ["latin"], axes: ["wdth"] });
 
 type Errors = FormErrors;
 type Name = keyof Errors;
@@ -38,7 +40,7 @@ type Preview = { url: string; name: string };
 /** A saved application, shown read-only to the admin / operation team. */
 export type SavedApplication = {
   id: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "suspended" | "terminated";
   hasSignature: boolean;
   values: Record<string, string | null>; // column -> value, dates as YYYY-MM-DD
   audit: [when: string, what: string, by: string][];
@@ -97,6 +99,12 @@ const INP =
 const AREA = INP.replace("h-[30px]", "resize-none py-1.5 leading-snug");
 const GREEN_BTN =
   "rounded-md bg-[#2f9a46] px-3 py-1.5 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60";
+
+// Section 5 signatories (images in /public). Update here when office-bearers change.
+const AUTHORITIES = [
+  { title: "General Secretary", name: "Er. Harmandeep AAE", sign: "/General-Secretary-Sign.png" },
+  { title: "State President", name: "Er. Ranjit Singh Dhillon JE", sign: "/President-Sign.png" },
+];
 
 /** Applicants get only the fields they fill in; staff (`saved`) get the full sheet including office sections 4-6. */
 export function MembershipForm({ saved, office }: { saved?: SavedApplication; office?: React.ReactNode }) {
@@ -205,8 +213,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
 
   const e = errors;
 
-  const sheet =
-    "mx-auto w-full max-w-[1240px] overflow-hidden rounded-xl bg-[#f4f8fd] text-[#16233b] shadow-[0_20px_60px_-30px_rgb(11_44_110/0.45)] ring-1 ring-[#0b2c6e]/10";
+  const sheet = `${archivo.className} mx-auto w-full max-w-[1240px] overflow-hidden rounded-xl bg-[#f4f8fd] text-[#16233b] shadow-[0_20px_60px_-30px_rgb(11_44_110/0.45)] ring-1 ring-[#0b2c6e]/10`;
 
   const body = (
     <>
@@ -508,7 +515,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                   Application Status
                 </legend>
                 <div className="flex flex-wrap gap-x-6 gap-y-1.5">
-                  {(["pending", "approved", "rejected"] as const).map((st) => (
+                  {["pending", "approved", "rejected", ...["suspended", "terminated"].filter((x) => x === saved.status)].map((st) => (
                     <Radio key={st} name="office-status" label={st[0].toUpperCase() + st.slice(1)} checked={saved.status === st} />
                   ))}
                 </div>
@@ -540,15 +547,23 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
           <Panel tone="orange">
             <Head n={5} title="Approving Authority" icon={UserCircle} tone="orange" />
             <div className="grid grid-cols-2 gap-3 p-2.5">
-              {["General Secretary", "State President"].map((t) => (
-                <div key={t} className="flex h-[124px] flex-col rounded-md border border-[#f3d3a6] bg-white/70 px-3 pt-2.5 pb-1.5 text-center">
+              {AUTHORITIES.map((a) => (
+                <div key={a.title} className="flex h-[150px] flex-col rounded-md border border-[#f3d3a6] bg-white/70 px-3 pt-2.5 pb-1.5 text-center">
                   <p className="text-[14px] leading-tight font-semibold">
-                    {t}
+                    {a.title}
                     <br />
                     AOJE Punjab
                   </p>
+                  {/* Signed automatically once the application is approved. */}
+                  {saved.status !== "pending" && saved.status !== "rejected" && (
+                    // eslint-disable-next-line @next/next/no-img-element -- tiny static PNG, no optimisation needed
+                    <img src={a.sign} alt={`Signature of ${a.name}`} className="mx-auto mt-auto h-11 max-w-full object-contain" />
+                  )}
                   <div className="mx-2 mt-auto border-t border-[#8a97a8]" />
-                  <p className="mt-1.5 text-[12.5px] text-[#3b4658]">(Signature &amp; Seal)</p>
+                  <p className="mt-1.5 text-[12.5px] leading-tight text-[#3b4658]">
+                    <span className="block font-semibold text-[#16233b]">{a.name}</span>
+                    {a.title}
+                  </p>
                 </div>
               ))}
             </div>

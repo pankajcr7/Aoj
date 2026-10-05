@@ -1,6 +1,27 @@
 // Dropdown options for the membership form. Edit these lists to match the real office structure.
 
-export const ZONES = ["North (Jalandhar)", "South (Patiala)", "West (Bathinda)", "Central (Ludhiana)", "Border (Amritsar)"];
+// Distribution zones first, then the other Chief Engineer offices.
+export const ZONES = [
+  "CHIEF ENGINEER/DS SOUTH ZONE PATIALA",
+  "CHIEF ENGINEER/DS CENTRAL ZONE LUDHIANA",
+  "CHIEF ENGINEER/DS NORTH ZONE JALANDHAR",
+  "CHIEF ENGINEER/DS WEST ZONE BATHINDA",
+  "CHIEF ENGINEER/DS BORDER ZONE AMRITSAR",
+  "CHIEF ENGINEER/DS EAST ZONE MOHALI",
+  "CHIEF ENGINEER/P&M LUDHIANA",
+  "CHIEF ENGINEER/TA & I PATIALA",
+  "CHIEF ENGINEER/EA & MMTS PATIALA",
+  "CHIEF ENGINEER/FUEL PATIALA",
+  "CHIEF ENGINEER/IT PATIALA",
+  "CHIEF ENGINEER/DISTRIBUTION PROJECTS",
+  "CHIEF ENGINEER/ARR PATIALA",
+  "CHIEF ENGINEER/HYDEL PROJECTS PATIALA",
+  "CHIEF ENGINEER/HRD PATIALA",
+  "CHIEF ENGINEER/MM PATIALA",
+  "CHIEF ENGINEER/PLANNING PATIALA",
+  "CHIEF ENGINEER/COMMERCIAL PATIALA",
+  "CHIEF ENGINEER/STORE & WORKSHOP LUDHIANA",
+];
 
 export const QUALIFICATIONS = ["ITI", "Diploma", "BE", "B.Tech", "M.Tech"] as const;
 

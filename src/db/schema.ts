@@ -16,7 +16,7 @@ const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 export const membershipSeq = pgSequence("membership_seq", { startWith: 1 });
 
 export const role = pgEnum("role", ["admin", "operations", "member"]);
-export const status = pgEnum("application_status", ["pending", "approved", "rejected"]);
+export const status = pgEnum("application_status", ["pending", "approved", "rejected", "suspended", "terminated"]);
 export const company = pgEnum("company", ["PSPCL", "PSTCL"]);
 
 // Mirrors the paper "Membership Form" field-for-field (numbers = form item no.).
