@@ -34,4 +34,6 @@ export const HEADQUARTERS = [
 
 export const DESIGNATIONS = ["JE (Electrical)", "JE (Civil)", "JE (Mechanical)", "AAE"];
 
-export const MEMBERSHIP_TYPES = ["Ordinary", "Life"];
+export const MEMBERSHIP_TYPES = ["Monthly Membership (Rs.250/-)", "Annual Membership (Rs.2400/-)"];
+// No longer offered, but earlier applications may have them; still valid so the Master ID can save corrections.
+export const LEGACY_MEMBERSHIP_TYPES = ["Ordinary", "Life"];

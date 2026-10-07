@@ -12,8 +12,8 @@ import {
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
-// Membership numbers: AOJE-0001, AOJE-0002, ... (issued in order on approval)
-export const membershipSeq = pgSequence("membership_seq", { startWith: 1 });
+// Membership numbers: AOJE-1001, AOJE-1002, ... (issued in order on approval)
+export const membershipSeq = pgSequence("membership_seq", { startWith: 1001 });
 
 export const role = pgEnum("role", ["admin", "operations", "member"]);
 export const status = pgEnum("application_status", ["pending", "approved", "rejected", "suspended", "terminated"]);

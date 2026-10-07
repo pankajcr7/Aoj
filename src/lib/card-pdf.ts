@@ -23,7 +23,7 @@ export type CardData = {
   company: string;
   employeeId: string;
   membershipNo: string;
-  memberSince: string;
+  posting: string | null;
   circle: string;
   zone: string;
   contact: string;
@@ -69,6 +69,22 @@ function fit(text: string, font: PDFFont, size: number, maxWidth: number, min = 
 function text(page: PDFPage, s: string, x: number, y: number, font: PDFFont, size: number, color = INK, maxWidth = 1e4) {
   const f = fit(s, font, size, maxWidth);
   page.drawText(f.t, { x, y, size: f.size, font, color });
+}
+
+/** Word-wraps into at most `maxLines` lines; anything left over joins the last line (which `text` then shrinks to fit). */
+function wrap(s: string, font: PDFFont, size: number, maxWidth: number, maxLines = 2) {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of latin1(s).split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (!line || font.widthOfTextAtSize(next, size) <= maxWidth) line = next;
+    else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length > maxLines ? [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(" ")] : lines;
 }
 
 /** Text centred on cx. */
@@ -164,20 +180,22 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: 
   const nameW = f.bold.widthOfTextAtSize(first + restText, nf.size);
   page.drawText(first, { x: cx - nameW / 2, y: top(55.6), size: nf.size, font: f.bold, color: RED });
   if (restText) page.drawText(restText, { x: cx - nameW / 2 + f.bold.widthOfTextAtSize(first, nf.size), y: top(55.6), size: nf.size, font: f.bold, color: NAVY });
-  centred(page, d.designation, cx, top(58.9), f.reg, 6.2, MUTED);
+  centred(page, d.designation, cx, top(59.2), f.bold, 7.2, INK);
 
-  // ID bar: red tab + navy band
-  const by = top(66), bh = mm(5.6);
-  page.drawRectangle({ x: x + mm(14), y: by, width: W - mm(14), height: bh, color: NAVY });
-  page.drawRectangle({ x, y: by, width: mm(19), height: bh, color: RED });
-  page.drawCircle({ x: x + mm(19), y: by + bh / 2, size: bh / 2, color: RED });
-  page.drawText("ID No :", { x: x + mm(3), y: by + mm(1.7), size: 8, font: f.bold, color: WHITE });
-  text(page, d.membershipNo, x + mm(24.5), by + mm(1.6), f.bold, 9.5, WHITE, W - mm(26.5));
+  // Membership number bar: red label tab (sized to its text) + navy band
+  const by = top(66), bh = mm(5.6), label = "Membership No :";
+  const tabEnd = mm(2.5) + f.bold.widthOfTextAtSize(label, 7) + mm(1);
+  page.drawRectangle({ x: x + tabEnd - mm(5), y: by, width: W - tabEnd + mm(5), height: bh, color: NAVY });
+  page.drawRectangle({ x, y: by, width: tabEnd, height: bh, color: RED });
+  page.drawCircle({ x: x + tabEnd, y: by + bh / 2, size: bh / 2, color: RED });
+  page.drawText(label, { x: x + mm(2.5), y: by + mm(1.9), size: 7, font: f.bold, color: WHITE });
+  const nx = tabEnd + bh / 2 + mm(2.5);
+  text(page, d.membershipNo, x + nx, by + mm(1.6), f.bold, 9.5, WHITE, W - nx - mm(2));
 
   // Details
   centred(page, `Employee ID: ${d.employeeId}`, cx, top(71), f.reg, 6.4, INK);
   centred(page, `Mobile: ${d.contact}`, cx, top(74.4), f.reg, 6.4, INK);
-  centred(page, `${d.company}  |  Member since ${d.memberSince}`, cx, top(77.6), f.reg, 5.2, MUTED, W - mm(24));
+  centred(page, d.company, cx, top(77.6), f.bold, 5.6, MUTED, W - mm(24));
 
   barcode(page, d.membershipNo, x + mm(20), top(83.4), mm(4.2), mm(28));
 }
@@ -192,19 +210,22 @@ function back(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: I
   shape(page, x, y, "M24 0 H54 V9 C44 9 36 4 24 0 Z", NAVY);
   shape(page, x, y, "M20 0 H24 C36 4 44 9 54 9 V12 C42 12 33 6 20 0 Z", RED);
 
-  const rows: [string, string][] = [
+  const rows: [string, string | null][] = [
     ["Father's Name", d.fatherName],
     ["Organisation", d.company],
-    ["Employee ID", d.employeeId],
+    ["Present Posting", d.posting], // older applications may not have it
     ["Circle", d.circle],
     ["Zone", d.zone],
     ["Mobile", d.contact],
   ];
-  rows.forEach(([label, value], i) => {
-    const ry = top(15.5 + i * 5.7);
-    text(page, `${label}:`, lx, ry, f.bold, 6.2, NAVY);
-    text(page, value, lx, ry - mm(2.7), f.reg, 6.4, INK, vw);
-  });
+  let ry = 13; // mm from the top; long values take two lines (fits 6 rows with 2 of them wrapped)
+  for (const [label, value] of rows) {
+    if (!value) continue;
+    text(page, `${label}:`, lx, top(ry), f.bold, 5.9, NAVY);
+    const lines = wrap(value, f.reg, 6.2, vw);
+    lines.forEach((l, j) => text(page, l, lx, top(ry + 2.6 + j * 2.45), f.reg, 6.2, INK, vw));
+    ry += 2.3 + lines.length * 2.6;
+  }
 
   // Signatures: member (left), General Secretary (right)
   const sy = top(56);

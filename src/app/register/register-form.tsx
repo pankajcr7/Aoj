@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowsOut,
   Article,
   Briefcase,
   Buildings,
@@ -11,22 +12,23 @@ import {
   ClipboardText,
   IdentificationCard,
   Leaf,
-  MapPin,
   PenNib,
   User,
   UserCircle,
   UsersThree,
   WarningCircle,
+  X,
   type Icon,
 } from "@phosphor-icons/react";
 import { Archivo, Kaushan_Script } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useState, useTransition } from "react";
-import { DESIGNATIONS, DISCIPLINES, HEADQUARTERS, MEMBERSHIP_TYPES, QUALIFICATIONS, ZONES } from "@/lib/form-options";
+import { createContext, useContext, useRef, useState, useTransition } from "react";
+import { DESIGNATIONS, DISCIPLINES, HEADQUARTERS, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS, ZONES } from "@/lib/form-options";
 import { updateApplication } from "@/app/dashboard/actions";
 import { register, type FormErrors } from "./actions";
+import { ImageCropper } from "./image-cropper";
 
 const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
 // The form keeps its original paper-form look (and font), independent of the site theme.
@@ -54,22 +56,6 @@ const Saved = createContext<{ values: Record<string, string | null>; locked: boo
 const MAX_PHOTO = 500 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
 const NAVY = "#0b2c6e";
-
-/** Resize to max 800px and re-encode as JPEG, so any phone photo fits the 500 KB limit and the PDF card. */
-async function toJpeg(f: File): Promise<File> {
-  const bmp = await createImageBitmap(f); // honours EXIF rotation
-  const scale = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bmp.width * scale);
-  canvas.height = Math.round(bmp.height * scale);
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#fff"; // transparent PNGs get a white background
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
-  if (!blob) throw new Error("encode failed");
-  return new File([blob], f.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
-}
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -116,12 +102,20 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
   const [errors, setErrors] = useState<Errors>({});
   const [message, setMessage] = useState("");
   const [name, setName] = useState(v?.name ?? "");
-  const [posting, setPosting] = useState(v?.posting ?? "");
   const [hq, setHq] = useState(v?.headquarters ?? "");
   const savedPhoto = saved && { url: `/api/photo/${saved.id}`, name: "" };
   const savedSignature = saved?.hasSignature ? { url: `/api/photo/${saved.id}?signature`, name: "" } : undefined;
   const [photo, setPhoto] = useState<Preview | undefined>(savedPhoto);
   const [signature, setSignature] = useState<Preview | undefined>(savedSignature);
+  const cropInput = useRef<HTMLInputElement>(null); // the file input the cropper is working for
+  const [viewing, setViewing] = useState<string>(); // image shown full size
+  const [crop, setCrop] = useState<{
+    set: (p?: Preview) => void;
+    url: string;
+    name: string;
+    aspect: number;
+    title: string;
+  }>();
   const [done, setDone] = useState<{ ref?: string }>();
   const [pending, startTransition] = useTransition();
 
@@ -172,7 +166,6 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
     setErrors({});
     setMessage("");
     setName(v?.name ?? "");
-    setPosting(v?.posting ?? "");
     setHq(v?.headquarters ?? "");
     setPhoto(savedPhoto);
     setSignature(savedSignature);
@@ -189,22 +182,29 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
     }
   }
 
-  async function pickImage(input: HTMLInputElement, set: (p?: Preview) => void) {
+  // Picking an image opens the cropper; its JPEG output is what gets submitted.
+  function pickImage(input: HTMLInputElement, set: (p?: Preview) => void, aspect: number, title: string) {
     const picked = input.files?.[0];
     if (!picked) return set(undefined);
-    let f: File | undefined;
-    try {
-      f = await toJpeg(picked);
+    cropInput.current = input;
+    setCrop({ set, url: URL.createObjectURL(picked), name: picked.name, aspect, title });
+  }
+
+  function finishCrop(f: File | null) {
+    const input = cropInput.current;
+    if (!crop || !input) return;
+    const { set, url, name } = crop;
+    setCrop(undefined);
+    URL.revokeObjectURL(url);
+    const err = f ? imageError(f) : "Could not read this image. Please choose a JPG or PNG.";
+    if (f && !err) {
       const dt = new DataTransfer();
       dt.items.add(f);
-      input.files = dt.files; // the converted JPEG is what gets submitted
-    } catch {
-      f = undefined;
-    }
-    const err = f ? imageError(f) : "Could not read this image. Please choose a JPG or PNG.";
-    set(f && !err ? { url: URL.createObjectURL(f), name: picked.name } : undefined);
-    if (err) {
-      setErrors((prev) => ({ ...prev, [input.name]: [err] }));
+      input.files = dt.files;
+      set({ url: URL.createObjectURL(f), name });
+    } else {
+      set(undefined);
+      setErrors((prev) => ({ ...prev, [input.name]: [err!] }));
       input.value = "";
     }
   }
@@ -218,6 +218,8 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
   const body = (
     <>
       <Banner />
+      {crop && <ImageCropper src={crop.url} name={crop.name} aspect={crop.aspect} title={crop.title} onDone={finishCrop} />}
+      {viewing && <Lightbox src={viewing} onClose={() => setViewing(undefined)} />}
 
       <div className="space-y-3.5 px-3 pt-3 pb-4 sm:px-5">
         {/* Title row */}
@@ -309,8 +311,9 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                 aria-label="Passport-size photo"
                 aria-invalid={!!e.photo}
                 className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={(ev) => pickImage(ev.target, setPhoto)}
+                onChange={(ev) => pickImage(ev.target, setPhoto, 136 / 156, "Crop your photo")}
               />}
+              {photo && <ViewButton label="View photo full size" onView={() => setViewing(photo.url)} />}
             </label>
             <FieldError msg={e.photo} center />
             <p className="mt-2 truncate rounded-md px-2 py-1.5 text-center text-[19px] font-bold text-white uppercase" style={{ background: NAVY }}>
@@ -336,8 +339,9 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                 aria-label="Member signature"
                 aria-invalid={!!e.signature}
                 className="absolute inset-0 cursor-pointer opacity-0"
-                onChange={(ev) => pickImage(ev.target, setSignature)}
+                onChange={(ev) => pickImage(ev.target, setSignature, 5 / 2, "Crop your signature")}
               />}
+              {signature && <ViewButton label="View signature full size" onView={() => setViewing(signature.url)} />}
             </label>
             <FieldError msg={e.signature} center />
             <p className="mt-1.5 text-center text-[13px] leading-tight text-[#26344d]">
@@ -348,11 +352,6 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
           </Panel>
 
           <Panel className="divide-y divide-[#cfdcee] bg-[#eef5fe] px-4 py-2">
-            <Info icon={MapPin} title="Posting / Office">
-              <p className={`min-h-[44px] text-[15px] leading-snug break-words ${posting ? "" : "text-[#7b8798]"}`}>
-                {posting || "For Ex: Patiala Circle under South Zone, PSPCL, Patiala"}
-              </p>
-            </Info>
             <Info icon={Buildings} title="Headquarters">
               <input
                 list="headquarters-list"
@@ -432,7 +431,6 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                       rows={2}
                       className="h-[46px]"
                       placeholder="For Ex: Patiala Circle under South Zone, PSPCL, Patiala"
-                      onChange={(ev) => setPosting(ev.target.value)}
                     />
                   </Stack>
                   <Stack label="Office Address" req name="officeAddress">
@@ -484,7 +482,8 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                   <Row label="Membership Type" htmlFor="membershipType" />
                   <Select name="membershipType" id="membershipType" e={e} defaultValue="" required={false}>
                     <option value="">Select Membership Type</option>
-                    {MEMBERSHIP_TYPES.map((m) => (
+                    {/* An older application keeps its retired type as an option, so corrections don't blank it. */}
+                    {[...MEMBERSHIP_TYPES, ...LEGACY_MEMBERSHIP_TYPES.filter((m) => m === v?.membershipType)].map((m) => (
                       <option key={m}>{m}</option>
                     ))}
                   </Select>
@@ -791,6 +790,50 @@ function Head({ n, title, small, note, icon: I, tone = "blue" }: { n: number; ti
         {n}.&nbsp; {title} {small && <span className="text-[12.5px] font-medium normal-case">{small}</span>}
       </h3>
       {note && <span className="ml-auto rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium text-[#4a5a72]">{note}</span>}
+    </div>
+  );
+}
+
+/** Small expand button on an image preview. Sits inside the upload <label>, so it must not open the file picker. */
+function ViewButton({ label, onView }: { label: string; onView: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(ev) => {
+        ev.preventDefault();
+        onView();
+      }}
+      className="absolute right-1 bottom-1 z-10 grid size-7 place-items-center rounded-md bg-black/55 text-white transition hover:bg-black/75"
+    >
+      <ArrowsOut size={15} weight="bold" />
+    </button>
+  );
+}
+
+/** Full-size image viewer: close with the button, Escape, or a click outside the image. */
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal
+      aria-label="Full size image"
+      onClick={onClose}
+      onKeyDown={(ev) => ev.key === "Escape" && onClose()}
+      className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4 sm:p-10"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob / auth-protected preview */}
+      <img src={src} alt="" onClick={(ev) => ev.stopPropagation()} className="max-h-[85vh] max-w-[92vw] rounded-md bg-white object-contain shadow-2xl" />
+      <button
+        type="button"
+        autoFocus
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-4 right-4 grid size-10 place-items-center rounded-full bg-white/15 text-white transition hover:bg-white/30"
+      >
+        <X size={20} weight="bold" />
+      </button>
     </div>
   );
 }

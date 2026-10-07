@@ -1,6 +1,6 @@
 // Field rules shared by the signup form and Master ID corrections.
 import { z } from "zod";
-import { DESIGNATIONS, DISCIPLINES, MEMBERSHIP_TYPES, QUALIFICATIONS } from "./form-options";
+import { DESIGNATIONS, DISCIPLINES, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS } from "./form-options";
 
 export const MAX_IMAGE = 500 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png"]; // what the PDF card can embed; the form converts other formats
@@ -48,7 +48,10 @@ export const applicationSchema = z.object({
   headquarters: text,
   officeContact: optional,
   officialEmail: z.union([z.literal(""), z.email("Enter a valid email")]).optional().transform((v) => v || null),
-  membershipType: z.union([z.literal(""), z.enum(MEMBERSHIP_TYPES)]).optional().transform((v) => v || null),
+  membershipType: z
+    .union([z.literal(""), z.enum([...MEMBERSHIP_TYPES, ...LEGACY_MEMBERSHIP_TYPES])])
+    .optional()
+    .transform((v) => v || null),
 });
 
 export type ApplicationField = keyof z.infer<typeof applicationSchema>;

@@ -75,7 +75,7 @@ function ForgotForm({ onBack }: { onBack: () => void }) {
 
       <div className="mt-10 grid gap-2">
         <label htmlFor="f-loginId" className="text-sm font-medium">Login ID</label>
-        <input id="f-loginId" name="loginId" required autoComplete="username" placeholder="e.g. aoj0005" className="field" />
+        <input id="f-loginId" name="loginId" required autoComplete="username" placeholder="e.g. aoj1001" className="field" />
       </div>
       <div className="mt-5 grid gap-2">
         <label htmlFor="f-mobile" className="text-sm font-medium">Registered mobile number</label>

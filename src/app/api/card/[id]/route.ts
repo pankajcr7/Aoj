@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { applications } from "@/db/schema";
 import { getUser, STAFF } from "@/lib/auth";
 import { membershipCardPdf } from "@/lib/card-pdf";
-import { fmtDate } from "@/lib/format";
 
 // Staff can print any member's card; a member only their own. Approved members only.
 export async function GET(_req: Request, ctx: RouteContext<"/api/card/[id]">) {
@@ -18,7 +17,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/card/[id]">) {
   const [m] = await db
     .select({
       name: a.name, fatherName: a.fatherName, designation: a.designation, company: a.company, employeeId: a.employeeId,
-      membershipNo: a.membershipNo, reviewedAt: a.reviewedAt, circle: a.circle, zone: a.zone, contact: a.contact,
+      membershipNo: a.membershipNo, posting: a.posting, circle: a.circle, zone: a.zone, contact: a.contact,
       photo: a.photo, photoType: a.photoType, signature: a.signature, signatureType: a.signatureType,
     })
     .from(a)
@@ -28,7 +27,6 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/card/[id]">) {
   const pdf = await membershipCardPdf({
     ...m,
     membershipNo: m.membershipNo,
-    memberSince: fmtDate(m.reviewedAt),
     photo: new Uint8Array(m.photo),
     signature: m.signature && new Uint8Array(m.signature),
     logo: await readFile(join(process.cwd(), "public/logo.jpeg")),
