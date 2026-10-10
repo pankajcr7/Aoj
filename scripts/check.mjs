@@ -31,7 +31,9 @@ const approved = buildMessage("approved", { ...base, membershipNo: "AOJE-0001", 
 assert.match(approved.email.subject, /AOJE-0001/);
 assert.ok(approved.email.html.includes("Harjeet &lt;Kaur&gt;") && !approved.email.html.includes("<Kaur>"), "names are HTML-escaped");
 assert.ok(approved.email.text.includes("Password: Pw3xYz9Kq2") && approved.email.html.includes("Pw3xYz9Kq2"));
-assert.deepEqual(approved.sms, { name: "Harjeet <Kaur>", number: "AOJE-0001", login: "aoj0001", password: "Pw3xYz9Kq2" });
+assert.ok(!approved.email.html.includes("attached"), "no card note unless the card is attached");
+assert.ok(buildMessage("approved", { ...base, membershipNo: "AOJE-0001", loginId: "aoj0001", password: "x", cardAttached: true }).email.text.includes("card is attached"));
+assert.deepEqual(approved.sms,{ name: "Harjeet <Kaur>", number: "AOJE-0001", login: "aoj0001", password: "Pw3xYz9Kq2" });
 const rejected = buildMessage("rejected", { ...base, reason: "Employee ID does not match PSTCL records" });
 assert.equal(rejected.sms.reason, "Employee ID does not match...");
 assert.ok(rejected.email.text.includes("Employee ID does not match PSTCL records"), "email keeps the full reason");

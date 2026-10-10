@@ -9,6 +9,7 @@ export type MessageData = {
   loginId?: string;
   password?: string;
   reason?: string;
+  cardAttached?: boolean;
 };
 export type Message = { email: { subject: string; html: string; text: string }; sms: Record<string, string> };
 
@@ -88,7 +89,7 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
           html: layout(
             d.loginUrl,
             "Welcome to the association",
-            `${hi} your membership application has been approved. Here are your membership details and login.`,
+            `${hi} your membership application has been approved. Here are your membership details and login.${d.cardAttached ? " Your membership card is attached to this email as a PDF." : ""}`,
             [
               ["Membership No.", d.membershipNo!, true],
               ["Login ID", d.loginId!, true],
@@ -101,6 +102,7 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
             `Dear ${d.name},`,
             "",
             "Your AOJE Punjab membership is approved.",
+            d.cardAttached && "Your membership card is attached to this email as a PDF.",
             `Membership No.: ${d.membershipNo}`,
             `Login ID: ${d.loginId}`,
             `Password: ${d.password}`,

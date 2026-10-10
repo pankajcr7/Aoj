@@ -241,7 +241,8 @@ async function main() {
       bcryptjs: { default: { hash: async () => "mock-hash" } }, "next/cache": { revalidatePath: () => {} }, "@/lib/application-schema": applicationSchema,
       "@/lib/auth": { requireRole: async () => ({ id: "admin" }), STAFF: ["admin", "operations"] }, "@/lib/form-options": options,
       "@/lib/payment-rules": enabled ? rules : disabledRules,
-      "@/lib/credentials": load("src/lib/credentials.ts"), "@/lib/notify": { notify: async () => { state.notifications++; return { email: "skipped", sms: "skipped" }; } } });
+      "@/lib/credentials": load("src/lib/credentials.ts"), "@/lib/member-card": { memberCard: async () => null },
+      "@/lib/notify": { notify: async () => { state.notifications++; return { email: "skipped", sms: "skipped" }; } } });
     return { state, actions };
   }
   for (const status of ["pending", "created", "authorized", "failed", "refunded", "partially_refunded"]) {

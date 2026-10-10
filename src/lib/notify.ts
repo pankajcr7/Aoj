@@ -29,10 +29,17 @@ const SMS_TEMPLATE: Record<Kind, string | undefined> = {
   password: env.MSG91_TEMPLATE_PASSWORD,
 };
 
-async function sendEmail(to: string, msg: { subject: string; html: string; text: string }): Promise<Outcome> {
+export type Attachment = { filename: string; content: Uint8Array; contentType: string };
+
+async function sendEmail(to: string, msg: { subject: string; html: string; text: string }, attachments?: Attachment[]): Promise<Outcome> {
   if (!mailer) return ["skipped", "Email not configured (SMTP_HOST)"];
   try {
-    await mailer.sendMail({ from: env.MAIL_FROM ?? env.SMTP_USER, to, ...msg });
+    await mailer.sendMail({
+      from: env.MAIL_FROM ?? env.SMTP_USER,
+      to,
+      ...msg,
+      attachments: attachments?.map((a) => ({ ...a, content: Buffer.from(a.content) })),
+    });
     return ["sent"];
   } catch (e) {
     return ["failed", (e as Error).message.slice(0, 300)];
@@ -61,10 +68,18 @@ async function sendSms(mobile: string, kind: Kind, vars: Record<string, string>)
 type Recipient = { id: string; name: string; email: string; contact: string };
 
 /** Sends email + SMS in parallel and logs the outcome. Never throws: a failed message must not undo the action. */
-export async function notify(kind: Kind, to: Recipient, extra: Omit<MessageData, "name" | "ref" | "loginUrl"> = {}): Promise<Delivery> {
+export async function notify(
+  kind: Kind,
+  to: Recipient,
+  extra: Omit<MessageData, "name" | "ref" | "loginUrl"> = {},
+  attachments?: Attachment[],
+): Promise<Delivery> {
   const loginUrl = `${(env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/login`;
   const msg = buildMessage(kind, { name: to.name, ref: refFor(to.id), loginUrl, ...extra });
-  const [[email, emailError], [sms, smsError]] = await Promise.all([sendEmail(to.email, msg.email), sendSms(to.contact, kind, msg.sms)]);
+  const [[email, emailError], [sms, smsError]] = await Promise.all([
+    sendEmail(to.email, msg.email, attachments),
+    sendSms(to.contact, kind, msg.sms),
+  ]);
 
   await db
     .insert(notifications)

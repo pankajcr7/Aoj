@@ -12,6 +12,7 @@ import { requireRole, STAFF } from "@/lib/auth";
 import { CARD_PAYMENT_LABELS } from "@/lib/form-options";
 import { RAZORPAY_ENABLED } from "@/lib/payment-rules";
 import { generatePassword, memberLoginId, membershipNo } from "@/lib/credentials";
+import { memberCard } from "@/lib/member-card";
 import { notify, type Delivery } from "@/lib/notify";
 
 export type Credentials = { error?: string; paymentConfirmationRequired?: boolean; loginId?: string; password?: string; membershipNo?: string; delivery?: Delivery };
@@ -64,7 +65,14 @@ export async function approveApplication(applicationId: string, confirmUnpaid = 
     return { error: "This application was already reviewed." };
   }
   refresh();
-  const delivery = await notify("approved", await contactOf(applicationId), { membershipNo: membershipNo(n), loginId, password });
+  // The card is a bonus: if it can't be built, the approval email still goes out without it.
+  const card = await memberCard(applicationId).catch((e) => (console.error("card for approval email failed", e), null));
+  const delivery = await notify(
+    "approved",
+    await contactOf(applicationId),
+    { membershipNo: membershipNo(n), loginId, password, cardAttached: !!card },
+    card ? [{ filename: card.filename, content: card.pdf, contentType: "application/pdf" }] : undefined,
+  );
   return { loginId, password, membershipNo: membershipNo(n), delivery };
 }
 
