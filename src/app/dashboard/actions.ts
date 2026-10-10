@@ -21,7 +21,10 @@ export type Result = { error?: string; ok?: boolean; delivery?: Delivery };
 const contactOf = async (applicationId: string) =>
   (
     await db
-      .select({ id: applications.id, name: applications.name, email: applications.email, contact: applications.contact })
+      .select({
+        id: applications.id, name: applications.name, email: applications.email, contact: applications.contact,
+        cardEmailRequested: applications.cardEmailRequested,
+      })
       .from(applications)
       .where(eq(applications.id, applicationId))
   )[0];
@@ -65,11 +68,14 @@ export async function approveApplication(applicationId: string, confirmUnpaid = 
     return { error: "This application was already reviewed." };
   }
   refresh();
-  // The card is a bonus: if it can't be built, the approval email still goes out without it.
-  const card = await memberCard(applicationId).catch((e) => (console.error("card for approval email failed", e), null));
+  const to = await contactOf(applicationId);
+  // Card only for members who asked for it on the form. If it can't be built, the approval email still goes out without it.
+  const card = to.cardEmailRequested
+    ? await memberCard(applicationId).catch((e) => (console.error("card for approval email failed", e), null))
+    : null;
   const delivery = await notify(
     "approved",
-    await contactOf(applicationId),
+    to,
     { membershipNo: membershipNo(n), loginId, password, cardAttached: !!card },
     card ? [{ filename: card.filename, content: card.pdf, contentType: "application/pdf" }] : undefined,
   );
