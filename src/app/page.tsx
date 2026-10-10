@@ -1,30 +1,26 @@
 import {
   Check,
-  Clock,
   CurrencyInr,
-  IdentificationCard,
   Lightning,
   ListChecks,
   MapPin,
   Phone,
-  TrendUp,
   UsersThree,
-  Wallet,
 } from "@phosphor-icons/react/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import { Logo, SiteHeader } from "@/components/site-header";
+import { RAZORPAY_ENABLED } from "@/lib/payment-rules";
 
 const facts = [
   { icon: Lightning, title: "PSPCL & PSTCL", sub: "Both corporations" },
   { icon: MapPin, title: "6 Zones", sub: "Across Punjab" },
-  { icon: CurrencyInr, title: "Free", sub: "No online payment" },
-  { icon: Wallet, title: "Salary Deduction", sub: "As the general house decides" },
+  { icon: CurrencyInr, title: "Rs.200 / month", sub: "Or Rs.2,000 / year" },
 ];
 
 const steps = [
   { title: "Fill in the Form", body: "Your personal, service and posting details, on a phone or computer.", img: "/images/step-1.jpg", tile: "bg-night" },
-  { title: "Photo & Declaration", body: "Upload a passport-size photo and accept the declaration.", img: "/images/step-machinery.jpg", tile: "bg-violet" },
+  { title: RAZORPAY_ENABLED ? "Photo & Payment" : "Photo & Submit", body: RAZORPAY_ENABLED ? "Upload your photo, accept the declaration and pay your selected membership fee." : "Upload your photo, accept the declaration and submit your application.", img: "/images/step-machinery.jpg", tile: "bg-violet" },
   { title: "Verification", body: "The Operation Team checks your details against employee records.", img: "/images/step-3.jpg", tile: "bg-brand" },
   { title: "Receive Your Login", body: "Membership number, login ID and password by email and SMS.", img: "/images/step-lab.jpg", tile: "bg-night" },
 ];
@@ -36,35 +32,22 @@ const membership = [
     items: ["JE (Electrical), JE (Civil), JE (Mechanical) and AAE", "Serving in PSPCL or PSTCL", "Posted in any zone, circle or office", "ITI, Diploma, BE, B.Tech or M.Tech"],
   },
   {
-    icon: IdentificationCard,
-    title: "What You Get",
-    items: ["Your own AOJE membership number", "Member login and ID card (PDF)", "Representation on pay and promotions", "Updates by email and SMS"],
-    dark: true,
-  },
-  {
     icon: ListChecks,
     title: "Keep Ready",
     items: ["Employee ID number", "Dates of joining PSPCL/PSTCL and current post", "Zone, circle, division, sub-division", "A recent passport-size photo"],
   },
 ];
 
-const demands = [
-  { icon: CurrencyInr, title: "Fair Pay", body: "Pay scales and starting pay for Junior Engineers in line with other engineering cadres of the state." },
-  { icon: Clock, title: "Fair Duty Hours", body: "Fixed, capped duty hours for engineers posted on field and sub-station duty." },
-  { icon: TrendUp, title: "Timely Promotions", body: "A fair promotion quota for Junior Engineers, with promotions given on time." },
-  { icon: UsersThree, title: "Vacancies Filled", body: "Enough staff in every sub-division so that field work stays safe and manageable." },
-];
-
 // State Body Leadership (from the association's office-bearer list).
 const heads = [
-  { role: "President", name: "Er. Ranjit Singh Dhillon JE", office: "O/o Operation Division Kharar", mobiles: ["82880-91003", "96461-10292"] },
-  { role: "General Secretary", name: "Er. Harmandeep AAE", office: "O/o Operation Division Samana", mobiles: ["86993-32052", "96461-38121"] },
+  { role: "AOJE / State President", name: "Er. Ranjeet Singh Dhillon", image: "/images/state-president-pic.jpeg", office: "O/o Operation Division Kharar", mobiles: ["82880-91003", "96461-10292"] },
+  { role: "Finance Secretary / AOJE", name: "Er. Navjot Singh", image: "/images/finance-secretary-PIC.jpeg", office: null, mobiles: ["98592-52000"] },
+  { role: "General Secretary / AOJE", name: "Er. Harmandeep", image: "/images/gneeral-scretary-pic.jpeg", office: "O/o Operation Division Samana", mobiles: ["86993-32052", "96461-38121"] },
 ];
 const leaders = [
   ["Sr. Vice President", "Er. Maninder Singh Dhillon AAE", "90412-02088"],
   ["Vice President", "Er. Jagtar Singh AAE", "80544-99135"],
   ["Secretary", "Er. Eshan Bansal AAE", "99140-69149"],
-  ["Finance Secretary", "Er. Navjot Singh Dhot AAE", "98592-52000"],
   ["Office Secretary", "Er. Gurmeet Singh JE", "98884-09262"],
   ["Joint Secretary Finance", "Er. Gurdit Singh JE", "95016-39126"],
   ["Chief Advisor", "Er. Harpreet Singh Grewal JE", "96461-00087"],
@@ -79,11 +62,6 @@ const leaders = [
   ["Executive Member", "Er. Inderjeet Singh JE", "94620-11102"],
 ];
 
-// "Er. Ranjit Singh Dhillon JE" -> "RD"
-const initials = (name: string) => {
-  const w = name.replace(/^Er\.\s*/, "").split(" ").slice(0, -1);
-  return (w[0][0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase();
-};
 
 function Mobile({ n, className = "text-muted hover:text-ink" }: { n: string; className?: string }) {
   return (
@@ -117,7 +95,6 @@ export default function Home() {
       <main className="flex-1">
         {/* Hero */}
         <section id="about" className="relative overflow-hidden">
-          <div aria-hidden className="slant absolute top-0 right-[-7%] hidden h-full w-[33%] bg-night lg:block" />
           <div aria-hidden className="slant absolute bottom-0 left-[-12%] hidden h-44 w-[28%] bg-surface-2 lg:block" />
 
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-16 sm:px-6 lg:min-h-[620px] lg:grid-cols-[1fr_1.05fr] lg:py-0">
@@ -140,29 +117,30 @@ export default function Home() {
                 <Link href="/login" className="btn-outline px-6 py-3">
                   Member Login
                 </Link>
+                <Link href="/login" target="_blank" rel="noopener noreferrer" className="btn-outline px-6 py-3">
+                  Admin Login
+                </Link>
               </div>
             </div>
 
-            <div className="rise relative h-[380px] sm:h-[480px] lg:h-[560px]" style={{ "--i": 2 } as React.CSSProperties}>
-              <div aria-hidden className="slant absolute inset-y-8 right-10 left-0 bg-brand" />
-              <div className="slant absolute inset-y-0 right-0 left-10 overflow-hidden">
-                <Image
-                  src="/images/hero.jpg"
-                  alt="Engineer in a safety helmet at an electrical panel"
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 560px, 100vw"
-                  className="object-cover object-top"
-                />
-              </div>
-              <span aria-hidden className="absolute bottom-6 left-[-4%] size-4 rotate-12 rounded-[3px] bg-brand" />
+            <div className="rise" style={{ "--i": 2 } as React.CSSProperties}>
+              <Image
+                src="/images/Cooling Towers Reflected on a Lake.png"
+                alt="Power station cooling towers reflected in a lake"
+                width={1254}
+                height={1254}
+                preload
+                sizes="(min-width: 1024px) 560px, 100vw"
+                className="rounded-2xl"
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
             </div>
           </div>
         </section>
 
         {/* Facts */}
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <ul className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {facts.map(({ icon: Icon, title, sub }, n) => (
               <li key={title} className="reveal flex items-center gap-4" style={{ "--i": n } as React.CSSProperties}>
                 <span className={`slant grid h-12 w-[68px] shrink-0 place-items-center text-white ${n % 2 ? "bg-night" : "bg-brand"}`}>
@@ -217,9 +195,8 @@ export default function Home() {
               <div className="flex flex-col justify-center px-8 py-10 lg:px-12">
                 <h2 className="max-w-md font-display text-3xl leading-tight font-bold sm:text-4xl">Registration Takes About Ten Minutes.</h2>
                 <p className="mt-4 text-sm text-white/70">
-                  Online fee: <span className="font-semibold text-white">₹0</span>
-                  <span className="mx-2 text-white/30">·</span>
-                  Subscription deducted from salary
+                  Membership: <span className="font-semibold text-white">Rs.200/- monthly or Rs.2,000/- yearly</span>
+                  <span className="mt-1 block">Optional physical PVC card: Rs.200/- including printing and delivery.</span>
                 </p>
                 <div className="mt-7 flex flex-wrap gap-3">
                   <Link href="/register" className="btn-brand px-5 py-2.5">
@@ -238,20 +215,20 @@ export default function Home() {
         <section id="membership" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
           <Heading
             title="Membership Made Simple"
-            body="No online payment. Subscription is deducted from salary, as decided by the general house."
+            body="Who can apply and what to keep ready for your membership application."
           />
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {membership.map(({ icon: Icon, title, items, dark }, n) => (
+          <div className="mt-10 grid gap-6 lg:grid-cols-2">
+            {membership.map(({ icon: Icon, title, items }, n) => (
               <article
                 key={title}
-                className={`reveal rounded-2xl p-8 ${dark ? "bg-night text-white" : "border border-line bg-surface"}`}
+                className="reveal rounded-2xl border border-line bg-surface p-8"
                 style={{ "--i": n } as React.CSSProperties}
               >
-                <span className={`slant grid h-11 w-[60px] place-items-center text-white ${dark ? "bg-brand" : "bg-night"}`}>
+                <span className="slant grid h-11 w-[60px] place-items-center bg-night text-white">
                   <Icon size={20} weight="bold" />
                 </span>
                 <h3 className="mt-6 font-display text-xl font-bold">{title}</h3>
-                <ul className={`mt-4 space-y-3 text-sm ${dark ? "text-white/75" : "text-muted"}`}>
+                <ul className="mt-4 space-y-3 text-sm text-muted">
                   {items.map((t) => (
                     <li key={t} className="flex gap-2.5">
                       <Check size={16} weight="bold" className="mt-0.5 shrink-0 text-brand" /> {t}
@@ -266,48 +243,30 @@ export default function Home() {
           </p>
         </section>
 
-        {/* What we work for */}
-        <section id="what-we-work-for" className="scroll-mt-20 bg-surface-2">
-          <div className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
-            <Heading center title="What We Work For" body="The demands the association raises with PSPCL and PSTCL management." />
-            <div className="mt-14 grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-              {demands.map(({ icon: Icon, title, body }, n) => (
-                <div key={title} className="reveal relative pt-9" style={{ "--i": n } as React.CSSProperties}>
-                  <span className="absolute top-0 left-1/2 z-10 grid size-[72px] -translate-x-1/2 place-items-center rounded-full border-4 border-surface-2 bg-brand text-white">
-                    <Icon size={28} weight="bold" />
-                  </span>
-                  <div className="slant-soft h-full bg-night px-9 pt-14 pb-10 text-center text-white">
-                    <p className="text-sm leading-relaxed text-white/75">{body}</p>
-                    <p className="mt-6 inline-flex items-center gap-2 font-display font-bold">
-                      <Dash className="bg-white" /> {title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-white/50">Charter of demands</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* State Body Leadership */}
         <section id="leadership" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
           <Heading center title="State Body Leadership" body="The office-bearers of the Association of Junior Engineers, Punjab." />
-          <div className="mx-auto mt-14 grid max-w-4xl gap-x-6 gap-y-12 md:grid-cols-2">
+          <div className="mx-auto mt-14 grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}>
             {heads.map((h) => (
-              <article key={h.role} className="reveal relative pt-9">
-                <span className="absolute top-0 left-1/2 z-10 grid size-[72px] -translate-x-1/2 place-items-center rounded-full border-4 border-canvas bg-brand font-display text-xl font-bold text-white">
-                  {initials(h.name)}
-                </span>
-                <div className="slant-soft bg-night px-10 pt-14 pb-10 text-center text-white">
-                  <p className="text-[11px] font-semibold tracking-[0.14em] text-brand uppercase">{h.role}</p>
-                  <h3 className="mt-2 font-display text-2xl font-bold">{h.name}</h3>
-                  <p className="mt-1 text-sm text-white/60">{h.office}</p>
-                  <p className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1">
-                    {h.mobiles.map((n) => (
-                      <Mobile key={n} n={n} className="text-white/80 hover:text-white" />
-                    ))}
-                  </p>
+              <article key={h.role} className="reveal rounded-2xl bg-night text-center text-white" style={{ padding: "32px 24px" }}>
+                <div className="mx-auto overflow-hidden rounded-full border-4 border-canvas bg-surface" style={{ width: 128, height: 128 }}>
+                  <Image
+                    src={h.image}
+                    alt={`Portrait of ${h.name}`}
+                    width={128}
+                    height={128}
+                    sizes="128px"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }}
+                  />
                 </div>
+                <p className="mt-6 text-[11px] font-semibold tracking-[0.14em] text-brand uppercase">{h.role}</p>
+                <h3 className="mt-2 font-display text-2xl font-bold">{h.name}</h3>
+                {h.office && <p className="mt-1 text-sm text-white/60">{h.office}</p>}
+                <p className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1">
+                  {h.mobiles.map((n) => (
+                    <Mobile key={n} n={n} className="text-white/80 hover:text-white" />
+                  ))}
+                </p>
               </article>
             ))}
           </div>
@@ -332,7 +291,7 @@ export default function Home() {
           <div>
             <Logo />
             <p className="mt-4 max-w-xs text-sm text-muted">
-              Association of Junior Engineers, Punjab (PSPCL/PSTCL) (Regd.). Licence No. PB41/253/351836 dated 03.10.2022.
+              Association of Junior Engineers, Punjab (PSPCL/PSTCL) (Regd.). Licence No. PB41/253/351836, dated 03.10.2022.
             </p>
           </div>
           <div>
@@ -347,7 +306,7 @@ export default function Home() {
           <div>
             <p className="font-display font-bold">Head Office</p>
             <address className="mt-4 text-sm text-muted not-italic">
-              Engineers&apos; Square, 20E/5, Ground Floor, Tripuri Town, Patiala, Punjab
+              H.Q. 67-C Ranjit Nagar Near Tiwana Chownk Patiala (147001)
             </address>
           </div>
           <div>

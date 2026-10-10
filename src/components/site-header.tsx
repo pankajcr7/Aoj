@@ -6,8 +6,8 @@ export function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2" aria-label="Association of Junior Engineers, Punjab home">
       <Image src="/logo.jpeg" alt="" width={36} height={36} className="size-9 rounded-full object-cover" />
-      <span className="font-display text-xl font-bold tracking-tight">
-        <span className="text-brand">AOJE</span>punjab
+      <span className="font-display text-base font-bold tracking-tight whitespace-nowrap text-brand sm:text-xl">
+        AOJE PUNJAB
       </span>
     </Link>
   );

@@ -23,33 +23,42 @@ export const refFor = (applicationId: string) => applicationId.slice(0, 8).toUpp
 
 type Row = [label: string, value: string, mono?: boolean];
 
-function layout(heading: string, intro: string, rows: Row[], outro: string, button?: { label: string; url: string }) {
+const NAVY = "#0b2c6e";
+
+/** Minimal branded email: logo header, heading, text, detail rows, optional button. `site` is any URL on the portal; the logo is served from it. */
+function layout(site: string, heading: string, intro: string, rows: Row[], outro: string, button?: { label: string; url: string }) {
+  const logo = new URL("/logo.jpeg", site).href;
   const rowHtml = rows
     .map(
-      ([l, v, mono]) =>
-        `<tr><td style="padding:10px 0;color:#5a6b62;font-size:13px;width:40%">${esc(l)}</td><td style="padding:10px 0;font-size:15px;font-weight:600;color:#0e1a14;${mono ? "font-family:Consolas,Menlo,monospace;letter-spacing:.5px" : ""}">${esc(v)}</td></tr>`,
+      ([l, v, mono], i) =>
+        `<tr><td style="padding:12px 0;${i ? "border-top:1px solid #eceef2;" : ""}color:#6b7280;font-size:13px;width:38%">${esc(l)}</td><td style="padding:12px 0;${i ? "border-top:1px solid #eceef2;" : ""}font-size:15px;font-weight:600;color:#111827;${mono ? "font-family:Consolas,Menlo,monospace;letter-spacing:.5px" : ""}">${esc(v)}</td></tr>`,
     )
     .join("");
   const buttonHtml = button
-    ? `<p style="margin:28px 0 8px"><a href="${esc(button.url)}" style="display:inline-block;background:#a8e25e;color:#0d1a06;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px">${esc(button.label)}</a></p>`
+    ? `<p style="margin:28px 0 0"><a href="${esc(button.url)}" style="display:inline-block;background:${NAVY};color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px">${esc(button.label)}</a></p>`
     : "";
-  return `<!doctype html><html><body style="margin:0;background:#f4f7f3;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f3;padding:24px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e3e9e1">
-<tr><td style="background:#0a1018;padding:18px 28px;color:#ffffff;font-size:18px;font-weight:700"><span style="color:#a8e25e">&#9889;</span> AOJ Punjab</td></tr>
-<tr><td style="padding:28px">
-<h1 style="margin:0 0 12px;font-size:22px;color:#0e1a14">${esc(heading)}</h1>
-<p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#33443b">${intro}</p>
-${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e3e9e1;border-bottom:1px solid #e3e9e1">${rowHtml}</table>` : ""}
+  return `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:#374151">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;padding:32px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px">
+<tr><td style="padding:28px 36px 22px;border-bottom:1px solid #eceef2">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+<td style="padding-right:14px"><img src="${esc(logo)}" width="52" height="52" alt="AOJE Punjab" style="display:block;border:0;border-radius:50%"></td>
+<td><div style="font-size:16px;font-weight:700;color:${NAVY};letter-spacing:.2px">AOJE Punjab</div><div style="font-size:12px;color:#6b7280;margin-top:2px">Association of Junior Engineers, Punjab</div></td>
+</tr></table></td></tr>
+<tr><td style="padding:32px 36px 36px">
+<h1 style="margin:0 0 14px;font-size:20px;font-weight:600;color:#111827">${esc(heading)}</h1>
+<p style="margin:0 0 22px;font-size:15px;line-height:1.65">${intro}</p>
+${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:6px;padding:4px 18px">${rowHtml}</table>` : ""}
 ${buttonHtml}
-<p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#33443b">${outro}</p>
+<p style="margin:24px 0 0;font-size:14px;line-height:1.65;color:#4b5563">${outro}</p>
 </td></tr>
-<tr><td style="padding:18px 28px;background:#f8faf7;color:#7a8a81;font-size:12px;line-height:1.5">Association of Junior Engineers, Punjab (PSPCL/PSTCL) (Regd.)<br>Engineers' Square, 20E/5, Tripuri Town, Patiala, Punjab</td></tr>
-</table></td></tr></table></body></html>`;
+</table>
+<p style="max-width:560px;margin:20px auto 0;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center">Association of Junior Engineers, Punjab (PSPCL/PSTCL) Regd.<br>H.Q. 67-C Ranjit Nagar Near Tiwana Chownk Patiala (147001)<br>This is an automated message from the AOJE Punjab membership portal.</p>
+</td></tr></table></body></html>`;
 }
 
 const text = (lines: (string | false | undefined)[]) =>
-  [...lines.filter(Boolean), "", "Association of Junior Engineers, Punjab", "Engineers' Square, 20E/5, Tripuri Town, Patiala"].join("\n");
+  [...lines.filter(Boolean), "", "Association of Junior Engineers, Punjab", "H.Q. 67-C Ranjit Nagar Near Tiwana Chownk Patiala (147001)"].join("\n");
 
 export function buildMessage(kind: Kind, d: MessageData): Message {
   const hi = `Dear ${esc(d.name)},`;
@@ -59,14 +68,15 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
     case "received":
       return {
         email: {
-          subject: "We received your AOJ membership application",
+          subject: "We received your AOJE membership application",
           html: layout(
+            d.loginUrl,
             "Application received",
             `${hi} thank you for applying for membership of the Association of Junior Engineers, Punjab.`,
             [["Reference", d.ref, true]],
             "The Operation Team will review your details. Once approved, you will receive your membership number and login by email and SMS.",
           ),
-          text: text([`Dear ${d.name},`, "", "We received your AOJ Punjab membership application.", `Reference: ${d.ref}`, "", "You will receive your membership number and login after approval."]),
+          text: text([`Dear ${d.name},`, "", "We received your AOJE Punjab membership application.", `Reference: ${d.ref}`, "", "You will receive your membership number and login after approval."]),
         },
         sms: { name, ref: d.ref },
       };
@@ -74,8 +84,9 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
     case "approved":
       return {
         email: {
-          subject: `Your AOJ membership is approved: ${d.membershipNo}`,
+          subject: `Your AOJE membership is approved: ${d.membershipNo}`,
           html: layout(
+            d.loginUrl,
             "Welcome to the association",
             `${hi} your membership application has been approved. Here are your membership details and login.`,
             [
@@ -84,12 +95,12 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
               ["Password", d.password!, true],
             ],
             "Please change your password after your first login (Account &rarr; Change password). Keep these details private.",
-            { label: "Log in to AOJ Punjab", url: d.loginUrl },
+            { label: "Log in to AOJE Punjab", url: d.loginUrl },
           ),
           text: text([
             `Dear ${d.name},`,
             "",
-            "Your AOJ Punjab membership is approved.",
+            "Your AOJE Punjab membership is approved.",
             `Membership No.: ${d.membershipNo}`,
             `Login ID: ${d.loginId}`,
             `Password: ${d.password}`,
@@ -104,17 +115,18 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
     case "rejected":
       return {
         email: {
-          subject: "Update on your AOJ membership application",
+          subject: "Update on your AOJE membership application",
           html: layout(
+            d.loginUrl,
             "Application not approved",
             `${hi} after review, your membership application could not be approved.`,
             [
               ["Reference", d.ref, true],
               ["Reason", d.reason!],
             ],
-            "If you think this is a mistake, please correct the details and apply again, or contact the head office at Tripuri Town, Patiala.",
+            "If you think this is a mistake, please correct the details and apply again, or contact the head office at H.Q. 67-C Ranjit Nagar Near Tiwana Chownk Patiala (147001).",
           ),
-          text: text([`Dear ${d.name},`, "", "Your AOJ Punjab membership application was not approved.", `Reference: ${d.ref}`, `Reason: ${d.reason}`, "", "You can correct the details and apply again."]),
+          text: text([`Dear ${d.name},`, "", "Your AOJE Punjab membership application was not approved.", `Reference: ${d.ref}`, `Reason: ${d.reason}`, "", "You can correct the details and apply again."]),
         },
         sms: { name, ref: d.ref, reason: smsVar(d.reason!) },
       };
@@ -122,18 +134,19 @@ export function buildMessage(kind: Kind, d: MessageData): Message {
     case "password":
       return {
         email: {
-          subject: "Your AOJ Punjab password was reset",
+          subject: "Your AOJE Punjab password was reset",
           html: layout(
+            d.loginUrl,
             "New password issued",
-            `${hi} a new password has been issued for your AOJ Punjab account.`,
+            `${hi} a new password has been issued for your AOJE Punjab account.`,
             [
               ["Login ID", d.loginId!, true],
               ["New password", d.password!, true],
             ],
             "Please change it after you log in. If you did not ask for this, contact the association office.",
-            { label: "Log in to AOJ Punjab", url: d.loginUrl },
+            { label: "Log in to AOJE Punjab", url: d.loginUrl },
           ),
-          text: text([`Dear ${d.name},`, "", "A new password was issued for your AOJ Punjab account.", `Login ID: ${d.loginId}`, `New password: ${d.password}`, `Log in: ${d.loginUrl}`]),
+          text: text([`Dear ${d.name},`, "", "A new password was issued for your AOJE Punjab account.", `Login ID: ${d.loginId}`, `New password: ${d.password}`, `Log in: ${d.loginUrl}`]),
         },
         sms: { name, login: smsVar(d.loginId!), password: smsVar(d.password!) },
       };

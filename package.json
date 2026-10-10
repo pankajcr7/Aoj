@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "user:create": "node --env-file=.env scripts/create-user.mjs",
-    "check": "node --experimental-strip-types --no-warnings scripts/check.mjs"
+    "check": "node --experimental-strip-types --no-warnings scripts/check.mjs",
+    "check:payments": "node scripts/check-payments.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

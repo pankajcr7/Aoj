@@ -1,6 +1,6 @@
 // Field rules shared by the signup form and Master ID corrections.
 import { z } from "zod";
-import { DESIGNATIONS, DISCIPLINES, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS } from "./form-options";
+import { BLOOD_GROUPS, DESIGNATIONS, DISCIPLINES, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS } from "./form-options";
 
 export const MAX_IMAGE = 500 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png"]; // what the PDF card can embed; the form converts other formats
@@ -27,7 +27,9 @@ export const applicationSchema = z.object({
   fatherName: text,
   designation: z.enum(DESIGNATIONS, "Select designation"),
   dob: pastDate,
+  bloodGroup: z.union([z.literal(""), z.enum(BLOOD_GROUPS, "Select blood group")]).optional().transform((v) => v || null),
   address: text,
+  correspondingAddress: optional,
   pinCode: z.string().regex(/^[1-9]\d{5}$/, "6-digit PIN code"),
   company: z.enum(["PSPCL", "PSTCL"]),
   dojCompany: pastDate,
@@ -44,10 +46,13 @@ export const applicationSchema = z.object({
   qualification: z.enum(QUALIFICATIONS),
   discipline: z.enum(DISCIPLINES),
   officeAddress: text,
-  posting: text,
-  headquarters: text,
+  posting: optional,
+  headquarters: optional,
   officeContact: optional,
   officialEmail: z.union([z.literal(""), z.email("Enter a valid email")]).optional().transform((v) => v || null),
+  cardEmailRequested: z.union([z.literal("on"), z.literal("true"), z.literal("")]).optional().transform((v) => v === "on" || v === "true"),
+  pvcCardRequested: z.union([z.literal("on"), z.literal("true"), z.literal("")]).optional().transform((v) => v === "on" || v === "true"),
+  pvcCardPayment: z.union([z.literal(""), z.enum(["pay_now", "pay_later"], "Choose one physical card payment option")]).optional().transform((v) => v || null),
   membershipType: z
     .union([z.literal(""), z.enum([...MEMBERSHIP_TYPES, ...LEGACY_MEMBERSHIP_TYPES])])
     .optional()
@@ -57,12 +62,14 @@ export const applicationSchema = z.object({
 export type ApplicationField = keyof z.infer<typeof applicationSchema>;
 
 // Shown in the audit trail.
-export const FIELD_LABELS: Record<ApplicationField | "photo" | "signature", string> = {
+export const FIELD_LABELS: Record<ApplicationField | "pvcCardRequested" | "photo" | "signature", string> = {
   name: "Full Name",
   fatherName: "Father's Name",
   designation: "Designation",
   dob: "Date of Birth",
+  bloodGroup: "Blood Group",
   address: "Residential Address",
+  correspondingAddress: "Corresponding Address",
   pinCode: "Pin Code",
   company: "Organisation",
   dojCompany: "Date of Joining PSPCL/PSTCL",
@@ -84,6 +91,9 @@ export const FIELD_LABELS: Record<ApplicationField | "photo" | "signature", stri
   officeContact: "Contact No. (Office)",
   officialEmail: "Email (Official)",
   membershipType: "Membership Type",
+  pvcCardRequested: "PVC Membership Card",
+  cardEmailRequested: "Membership Card by Email",
+  pvcCardPayment: "PVC Card Payment Preference",
   photo: "Passport Photo",
   signature: "Signature",
 };

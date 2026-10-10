@@ -26,14 +26,26 @@ export const ZONES = [
 export const QUALIFICATIONS = ["ITI", "Diploma", "BE", "B.Tech", "M.Tech"] as const;
 
 export const DISCIPLINES = ["Civil", "Electrical", "Mechanical"] as const;
+export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Not known"] as const;
 export const HEADQUARTERS = [
   "Amritsar", "Barnala", "Bathinda", "Faridkot", "Fatehgarh Sahib", "Fazilka", "Ferozepur", "Gurdaspur", "Hoshiarpur",
   "Jalandhar", "Kapurthala", "Ludhiana", "Malerkotla", "Mansa", "Moga", "Mohali", "Nawanshahr", "Pathankot", "Patiala",
   "Ropar", "Sangrur", "Sri Muktsar Sahib", "Tarn Taran",
 ];
 
-export const DESIGNATIONS = ["JE (Electrical)", "JE (Civil)", "JE (Mechanical)", "AAE"];
+export const DESIGNATIONS = [
+  "JUNIOR ENGINEER (ELECTRICAL)",
+  "JUNIOR ENGINEER (CIVIL)",
+  "ADDITIONAL ASSISTANT ENGINEER (ELECTRICAL)",
+  "ADDITIONAL ASSISTANT ENGINEER (CIVIL)",
+  "ASSISTANT ENGINEER (ELECTRICAL)",
+  "ASSISTANT ENGINEER (CIVIL)",
+  "JUNIOR ENGINEER (MECHANICAL)",
+  "ADDITIONAL ASSISTANT ENGINEER (MECHANICAL)",
+  "ASSISTANT ENGINEER (MECHANICAL)",
+];
 
-export const MEMBERSHIP_TYPES = ["Monthly Membership (Rs.250/-)", "Annual Membership (Rs.2400/-)"];
+export const MEMBERSHIP_TYPES = ["Monthly Membership (Rs.200/-)", "Yearly Membership (Rs.2000/-)"];
+export const CARD_PAYMENT_LABELS = { pay_now: "Pay now (Rs.200/-)", pay_later: "Pay later (Rs.200/-)" } as const;
 // No longer offered, but earlier applications may have them; still valid so the Master ID can save corrections.
-export const LEGACY_MEMBERSHIP_TYPES = ["Ordinary", "Life"];
+export const LEGACY_MEMBERSHIP_TYPES = ["Ordinary", "Life", "Monthly Membership (Rs.250/-)", "Annual Membership (Rs.2400/-)", "Monthly Membership (Rs.190/-)", "Yearly Membership (Rs.2200/-)"];

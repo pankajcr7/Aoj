@@ -2,6 +2,7 @@
 
 import { ArrowClockwise, ChatText, Check, CheckCircle, Copy, EnvelopeSimple, Power, UserPlus, WarningCircle, XCircle } from "@phosphor-icons/react";
 import { useActionState, useState } from "react";
+import { RAZORPAY_ENABLED } from "@/lib/payment-rules";
 import {
   approveApplication,
   changePassword,
@@ -83,11 +84,15 @@ export function SecretBox({ title, creds }: { title: string; creds: Credentials 
   );
 }
 
-export function ReviewPanel({ applicationId, pending }: { applicationId: string; pending: boolean }) {
-  const [approved, approve, approving] = useActionState(() => approveApplication(applicationId), {} as Credentials);
+export function ReviewPanel({ applicationId, pending, paymentNotReceived }: { applicationId: string; pending: boolean; paymentNotReceived: boolean }) {
+  const [approved, approve, approving] = useActionState(
+    (_: Credentials, formData: FormData) => approveApplication(applicationId, formData.get("confirmUnpaid") === "yes"),
+    {} as Credentials,
+  );
   const [rejected, reject, rejecting] = useActionState(rejectApplication.bind(null, applicationId), {} as Result);
   const [confirming, setConfirming] = useState(false);
   const [mode, setMode] = useState<"approve" | "reject">("approve");
+  const needsPaymentConfirmation = RAZORPAY_ENABLED && (paymentNotReceived || approved.paymentConfirmationRequired);
 
   if (approved.password) return <SecretBox title="Application approved. Member login created." creds={approved} />;
   if (rejected.ok)
@@ -108,7 +113,7 @@ export function ReviewPanel({ applicationId, pending }: { applicationId: string;
           <button
             key={m}
             type="button"
-            onClick={() => setMode(m)}
+            onClick={() => { setMode(m); setConfirming(false); }}
             className={`rounded-md py-2 capitalize transition ${mode === m ? "bg-surface text-ink shadow-sm" : "text-muted"}`}
           >
             {m}
@@ -122,20 +127,28 @@ export function ReviewPanel({ applicationId, pending }: { applicationId: string;
             Approving issues a membership number and creates the member&apos;s login. Check the details and photo first.
           </p>
           {confirming ? (
-            <div className="flex gap-2">
-              <button disabled={approving} className="btn-accent flex-1 py-3">
-                <CheckCircle size={18} weight="bold" /> {approving ? "Approving…" : "Yes, approve"}
-              </button>
-              <button type="button" onClick={() => setConfirming(false)} className="btn-outline py-3">
-                Cancel
-              </button>
+            <div className="space-y-3">
+              {needsPaymentConfirmation && (
+                <>
+                  <Alert msg="Payment is not received. Are you sure you want to accept the application?" />
+                  <input type="hidden" name="confirmUnpaid" value="yes" />
+                </>
+              )}
+              <div className="flex gap-2">
+                <button disabled={approving} className="btn-accent flex-1 py-3">
+                  <CheckCircle size={18} weight="bold" /> {approving ? "Approving…" : "Yes, approve"}
+                </button>
+                <button type="button" disabled={approving} onClick={() => setConfirming(false)} className="btn-outline py-3">
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <button type="button" onClick={() => setConfirming(true)} className="btn-accent w-full py-3">
               <CheckCircle size={18} weight="bold" /> Approve Application
             </button>
           )}
-          <Alert msg={approved.error} />
+          <Alert msg={approved.paymentConfirmationRequired && confirming ? undefined : approved.error} />
         </form>
       ) : (
         <form action={reject} className="space-y-3">

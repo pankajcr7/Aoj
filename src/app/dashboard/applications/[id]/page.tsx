@@ -5,7 +5,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MembershipForm } from "@/app/register/register-form";
 import { db } from "@/db";
-import { applicationEdits, applications, notifications, users } from "@/db/schema";
+import { applicationEdits, applications, notifications, payments, users } from "@/db/schema";
+import { RAZORPAY_ENABLED, money, PAYMENT_LABELS } from "@/lib/payment-rules";
 import { FIELD_LABELS } from "@/lib/application-schema";
 import { requireRole, STAFF } from "@/lib/auth";
 import { AccountControls, MembershipControls, ReviewPanel } from "../../forms";
@@ -45,9 +46,11 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
     .where(eq(applicationEdits.applicationId, id))
     .orderBy(applicationEdits.createdAt);
 
+  const charges = RAZORPAY_ENABLED ? await db.select().from(payments).where(eq(payments.applicationId, id)).orderBy(payments.createdAt) : [];
   const values = Object.fromEntries(
     Object.entries(a).map(([k, v]) => [k, v instanceof Date ? isoDate(v) : v == null ? null : String(v)]),
   );
+  values.paymentRecorded = charges.length ? "true" : "false";
   values.reviewer = reviewerId;
   values.loginId = member?.loginId ?? null;
   // Suspended / terminated: show the latest recorded reason in the remarks box.
@@ -76,7 +79,7 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
         office={
           <div className="space-y-4">
             {/* Always mounted so freshly issued credentials survive the refresh after approval. */}
-            <ReviewPanel applicationId={a.id} pending={a.status === "pending"} />
+            <ReviewPanel applicationId={a.id} pending={a.status === "pending"} paymentNotReceived={charges.some((charge) => charge.purpose === "registration" && charge.status !== "paid")} />
             {a.status === "approved" && (
               <a href={`/api/card/${a.id}`} target="_blank" rel="noopener" className="btn-outline w-full py-2.5">
                   <IdentificationCard size={18} weight="bold" /> Membership Card (PDF)
@@ -93,6 +96,17 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
         }
       />
 
+      {RAZORPAY_ENABLED && <section className="card mt-6 p-5">
+        <h2 className="mb-3 font-semibold">Razorpay payments</h2>
+        {charges.length ? <div className="grid gap-4 sm:grid-cols-2">{charges.map(payment => <div key={payment.id} className="rounded-lg border border-line p-3 text-sm">
+          <p className="font-semibold">{payment.purpose === "registration" ? "Membership and selected card" : "Physical PVC card"}: {money(payment.amount)}</p>
+          <p className={`mt-1 font-semibold ${payment.status === "paid" ? "text-accent" : "text-muted"}`}>{PAYMENT_LABELS[payment.status] ?? payment.status}</p>
+          <p className="mt-1 text-xs text-muted">Membership: {money(payment.membershipAmount)} | PVC: {money(payment.pvcAmount)}</p>
+          {payment.razorpayPaymentId && <p className="mt-2 break-all font-mono text-xs">Payment: {payment.razorpayPaymentId}</p>}
+          {payment.razorpayOrderId && <p className="mt-1 break-all font-mono text-xs">Order: {payment.razorpayOrderId}</p>}
+          {payment.paidAt && <p className="mt-1 text-xs text-muted">Received: {fmtDateTime(payment.paidAt)}</p>}
+        </div>)}</div> : <p className="text-sm text-muted">No online payment charge recorded for this earlier application.</p>}
+      </section>}
       <section className="card mt-6 p-5">
         <p className="mb-3 text-sm font-medium">Messages to applicant</p>
         {messages.length ? (

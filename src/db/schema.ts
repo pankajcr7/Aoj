@@ -1,13 +1,17 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   customType,
+  check,
   date,
+  integer,
   pgEnum,
   pgSequence,
   pgTable,
   text,
   timestamp,
   uuid,
+  unique,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
@@ -28,7 +32,9 @@ export const applications = pgTable("applications", {
   fatherName: text().notNull(), // 2
   designation: text().notNull(), // 3
   dob: date().notNull(), // 4
+  bloodGroup: text(), // Nullable for applications submitted before this field was added.
   address: text().notNull(), // 5
+  correspondingAddress: text(), // Nullable for applications submitted before this field was added.
   pinCode: text().notNull(),
   company: company().notNull(),
   dojCompany: date().notNull(), // 6
@@ -53,6 +59,9 @@ export const applications = pgTable("applications", {
   officeContact: text(),
   officialEmail: text(),
   membershipType: text(),
+  pvcCardRequested: boolean().notNull().default(false),
+  cardEmailRequested: boolean().notNull().default(false),
+  pvcCardPayment: text(), // Payment preference only; not confirmation of payment.
 
   // ponytail: photo stored in Postgres (capped at 500 KB); move to object storage if volume grows
   photo: bytea().notNull(),
@@ -112,3 +121,28 @@ export const applicationEdits = pgTable("application_edits", {
     .references(() => users.id),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
+
+// One reusable Razorpay order per charge; cancelled checkout retries cannot create duplicate charges.
+export const payments = pgTable("payments", {
+  id: uuid().primaryKey().defaultRandom(),
+  applicationId: uuid().notNull().references(() => applications.id, { onDelete: "cascade" }),
+  purpose: text().notNull(),
+  amount: integer().notNull(), // INR paise, calculated on the server.
+  membershipAmount: integer().notNull().default(0),
+  pvcAmount: integer().notNull().default(0),
+  status: text().notNull().default("pending"),
+  razorpayOrderId: text().unique(),
+  razorpayPaymentId: text().unique(),
+  orderCreatingAt: timestamp({ withTimezone: true }),
+  paidAt: timestamp({ withTimezone: true }),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("payments_application_purpose_unique").on(table.applicationId, table.purpose),
+  check("payments_purpose_check", sql`${table.purpose} in ('registration', 'pvc_card')`),
+  check("payments_amount_check", sql`${table.amount} > 0`),
+  check("payments_membership_amount_check", sql`${table.membershipAmount} >= 0`),
+  check("payments_pvc_amount_check", sql`${table.pvcAmount} in (0, 20000)`),
+  check("payments_status_check", sql`${table.status} in ('pending','created','authorized','paid','failed','refunded','partially_refunded')`),
+  check("payments_amount_sum", sql`${table.amount} = ${table.membershipAmount} + ${table.pvcAmount}`),
+]);

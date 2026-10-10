@@ -46,8 +46,9 @@ assert.equal(latin1("ਹਰਜੀਤ Kaur"), "Kaur", "unsupported scripts are dr
 const png1x1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
 const card = await membershipCardPdf({
   name: "Gurpreet Singh Sandhu With A Very Long Name Indeed", fatherName: "Balwinder Singh", designation: "JE (Electrical)",
+  address: "20E/5 Tripuri Town, Patiala", division: "Patiala", subDivision: "City", posting: null,
   company: "PSPCL", employeeId: "PSPCL/JE/40718", membershipNo: "AOJE-0001", memberSince: "30 Sept 2026", circle: "Patiala",
-  zone: "South (Patiala)", contact: "9876543210", photo: png1x1, photoType: "image/png",
+  zone: "South (Patiala)", contact: "9876543210", bloodGroup: "O+", photo: png1x1, photoType: "image/png",
   signature: png1x1, signatureType: "image/png", logo: readFileSync("public/logo.jpeg"),
 });
 const loaded = await PDFDocument.load(card);

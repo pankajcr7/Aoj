@@ -1,5 +1,8 @@
 import { ArrowRight, CaretLeft, CaretRight, DownloadSimple, MagnifyingGlass, Tray } from "@phosphor-icons/react/ssr";
 import { and, count, desc, eq } from "drizzle-orm";
+import { payments } from "@/db/schema";
+import { alias } from "drizzle-orm/pg-core";
+import { RAZORPAY_ENABLED, PAYMENT_LABELS, money } from "@/lib/payment-rules";
 import Link from "next/link";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
@@ -7,6 +10,7 @@ import { requireRole, STAFF } from "@/lib/auth";
 import { searchFilter } from "../queries";
 import { EmptyState, fmtDate, PageHeader, StatusBadge } from "../ui";
 
+const cardCharge = alias(payments, "card_charge");
 const PAGE_SIZE = 25;
 const TABS = ["pending", "approved", "rejected", "all"] as const;
 type Tab = (typeof TABS)[number];
@@ -24,9 +28,13 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/das
       .select({
         id: applications.id, name: applications.name, employeeId: applications.employeeId, company: applications.company,
         zone: applications.zone, circle: applications.circle, status: applications.status, createdAt: applications.createdAt,
-        membershipNo: applications.membershipNo,
+        membershipNo: applications.membershipNo, pvcCardRequested: applications.pvcCardRequested,
+        cardEmailRequested: applications.cardEmailRequested, pvcCardPayment: applications.pvcCardPayment,
+        paymentStatus: payments.status, paymentAmount: payments.amount, registrationPvcAmount: payments.pvcAmount, cardStatus: cardCharge.status,
       })
       .from(applications)
+      .leftJoin(payments, and(eq(payments.applicationId, applications.id), eq(payments.purpose, "registration")))
+      .leftJoin(cardCharge, and(eq(cardCharge.applicationId, applications.id), eq(cardCharge.purpose, "pvc_card")))
       .where(where)
       .orderBy(tab === "pending" ? applications.createdAt : desc(applications.createdAt))
       .limit(PAGE_SIZE + 1)
@@ -96,6 +104,15 @@ export default async function ApplicationsPage({ searchParams }: PageProps<"/das
                         <span>
                           <span className="block font-semibold">{a.name}</span>
                           <span className="block text-xs text-muted">{a.membershipNo ?? a.employeeId}</span>
+                          {RAZORPAY_ENABLED && a.paymentStatus && <span className="mt-1 block text-[11px] font-semibold text-muted">Registration payment: {PAYMENT_LABELS[a.paymentStatus] ?? a.paymentStatus} {a.paymentAmount ? `(${money(a.paymentAmount)})` : ""}</span>}
+                          {a.cardEmailRequested && (
+                            <span className="mt-1 block text-[11px] font-semibold text-accent">Card by email requested</span>
+                          )}
+                          {a.pvcCardRequested && (
+                            <span className="mt-1 inline-block rounded-sm bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold text-accent">
+                              PVC card{RAZORPAY_ENABLED ? (a.paymentStatus === "paid" && !!a.registrationPvcAmount) || a.cardStatus === "paid" ? " - paid Rs.200/-" : a.pvcCardPayment === "pay_now" ? " - pay now (Rs.200/-)" : a.pvcCardPayment === "pay_later" ? " - pay later (Rs.200/-)" : "" : ""}
+                            </span>
+                          )}
                         </span>
                       </Link>
                     </td>

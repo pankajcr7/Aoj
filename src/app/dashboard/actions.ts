@@ -5,14 +5,16 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { applicationEdits, applications, users } from "@/db/schema";
+import { applicationEdits, applications, payments, users } from "@/db/schema";
 import { applicationSchema, fileOf, imageError, stringsOf } from "@/lib/application-schema";
 import type { FormErrors } from "@/app/register/actions";
 import { requireRole, STAFF } from "@/lib/auth";
+import { CARD_PAYMENT_LABELS } from "@/lib/form-options";
+import { RAZORPAY_ENABLED } from "@/lib/payment-rules";
 import { generatePassword, memberLoginId, membershipNo } from "@/lib/credentials";
 import { notify, type Delivery } from "@/lib/notify";
 
-export type Credentials = { error?: string; loginId?: string; password?: string; membershipNo?: string; delivery?: Delivery };
+export type Credentials = { error?: string; paymentConfirmationRequired?: boolean; loginId?: string; password?: string; membershipNo?: string; delivery?: Delivery };
 export type Result = { error?: string; ok?: boolean; delivery?: Delivery };
 
 const contactOf = async (applicationId: string) =>
@@ -28,8 +30,14 @@ const isUnique = (e: unknown) =>
   (e as { code?: string }).code === "23505" || (e as { cause?: { code?: string } }).cause?.code === "23505";
 
 /** Approve a pending application: issue membership number + member login in one atomic statement. */
-export async function approveApplication(applicationId: string): Promise<Credentials> {
+export async function approveApplication(applicationId: string, confirmUnpaid = false): Promise<Credentials> {
   const reviewer = await requireRole(STAFF);
+  const [charge] = RAZORPAY_ENABLED
+    ? await db.select({ status: payments.status }).from(payments).where(and(eq(payments.applicationId, applicationId), eq(payments.purpose, "registration")))
+    : [];
+  const unpaidConfirmed = !RAZORPAY_ENABLED || confirmUnpaid === true;
+  if (charge && charge.status !== "paid" && !unpaidConfirmed)
+    return { paymentConfirmationRequired: true, error: "Payment is not received. Are you sure you want to accept the application?" };
   const { rows } = await db.execute<{ n: number }>(sql`select nextval('membership_seq')::int as n`);
   const n = rows[0].n;
   const password = generatePassword();
@@ -42,13 +50,19 @@ export async function approveApplication(applicationId: string): Promise<Credent
       update applications
       set status = 'approved', membership_no = ${membershipNo(n)}, reviewed_by = ${reviewer.id}, reviewed_at = now(), rejection_reason = null
       where id = ${applicationId} and status = 'pending'
+        and (${unpaidConfirmed} or not exists (select 1 from payments where application_id = ${applicationId} and purpose = 'registration' and status <> 'paid'))
       returning id
     )
     insert into users (login_id, password_hash, application_id)
     select ${loginId}, ${hash}, id from upd
     returning id`);
 
-  if (!created.rows.length) return { error: "This application was already reviewed." };
+  if (!created.rows.length) {
+    const [current] = await db.select({ status: applications.status }).from(applications).where(eq(applications.id, applicationId));
+    if (RAZORPAY_ENABLED && current?.status === "pending")
+      return { paymentConfirmationRequired: true, error: "Payment is not received. Are you sure you want to accept the application?" };
+    return { error: "This application was already reviewed." };
+  }
   refresh();
   const delivery = await notify("approved", await contactOf(applicationId), { membershipNo: membershipNo(n), loginId, password });
   return { loginId, password, membershipNo: membershipNo(n), delivery };
@@ -183,11 +197,21 @@ export async function updateApplication(applicationId: string, formData: FormDat
   const [current] = await db.select().from(applications).where(eq(applications.id, applicationId));
   if (!current) return { message: "Application not found." };
 
-  const changed = Object.entries(parsed.data).filter(([k, v]) => (current[k as keyof typeof current] ?? "") !== (v ?? ""));
+  const [charge] = RAZORPAY_ENABLED ? await db.select({ id: payments.id }).from(payments).where(eq(payments.applicationId, applicationId)).limit(1) : [];
+  if (charge && (parsed.data.membershipType !== current.membershipType || parsed.data.pvcCardPayment !== current.pvcCardPayment))
+    return { errors: { membershipType: ["Membership type and card payment choice are fixed once a payment charge is recorded."] } };
+  const fields = { ...parsed.data,
+    pvcCardRequested: RAZORPAY_ENABLED ? !!parsed.data.pvcCardPayment : parsed.data.pvcCardRequested,
+    pvcCardPayment: RAZORPAY_ENABLED ? parsed.data.pvcCardPayment : current.pvcCardPayment,
+  };
+  const changed = Object.entries(fields).filter(([k, v]) => (current[k as keyof typeof current] ?? "") !== (v ?? ""));
   const remarks = String(formData.get("editRemarks") ?? "").trim().slice(0, 500) || null;
   const log = (field: string, oldValue: string | null, newValue: string | null) =>
     ({ applicationId, field, oldValue, newValue, remarks, changedBy: me.id });
-  const edits = changed.map(([k, v]) => log(k, (current[k as keyof typeof current] as string | null) ?? null, v ?? null));
+  const auditValue = (value: unknown) =>
+    typeof value === "boolean" ? (value ? "Requested" : "Not requested") : value == null ? null : String(value);
+  const displayValue = (field: string, value: unknown) => field === "pvcCardPayment" && (value === "pay_now" || value === "pay_later") ? CARD_PAYMENT_LABELS[value] : auditValue(value);
+  const edits = changed.map(([k, v]) => log(k, displayValue(k, current[k as keyof typeof current]), displayValue(k, v)));
   if (photo) edits.push(log("photo", null, "New photo uploaded"));
   if (signature) edits.push(log("signature", null, "New signature uploaded"));
   if (!edits.length) return { message: "Nothing was changed." };

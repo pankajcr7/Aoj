@@ -2,7 +2,9 @@ import { ArrowRight, CheckCircle, ClipboardText, Clock, IdentificationCard, Tray
 import { count, desc, eq, gte, sql } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
-import { applications } from "@/db/schema";
+import { RazorpayPayment } from "@/components/razorpay-payment";
+import { RAZORPAY_ENABLED, PVC_CARD_PAISE } from "@/lib/payment-rules";
+import { applications, payments } from "@/db/schema";
 import { requireRole } from "@/lib/auth";
 import { Detail, EmptyState, fmtDate, PageHeader, StatCard, StatusBadge } from "./ui";
 
@@ -113,7 +115,8 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
           company: applications.company, employeeId: applications.employeeId, membershipNo: applications.membershipNo,
           zone: applications.zone, circle: applications.circle, division: applications.division, subDivision: applications.subDivision,
           contact: applications.contact, email: applications.email, reviewedAt: applications.reviewedAt, qualification: applications.qualification,
-          discipline: applications.discipline, posting: applications.posting, headquarters: applications.headquarters,
+          pvcCardRequested: applications.pvcCardRequested,
+          discipline: applications.discipline, posting: applications.posting, headquarters: applications.headquarters, bloodGroup: applications.bloodGroup,
         })
         .from(applications)
         .where(eq(applications.id, applicationId))
@@ -121,6 +124,9 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
 
   if (!a) return <EmptyState icon={Tray} title="No membership found" body="This account is not linked to a membership. Please contact the admin." />;
 
+  const charges = RAZORPAY_ENABLED ? await db.select().from(payments).where(eq(payments.applicationId, a.id)) : [];
+  const cardPaid = charges.some(p => p.pvcAmount > 0 && p.status === "paid");
+  const cardCharge = charges.find(p => p.purpose === "pvc_card");
   return (
     <>
       <PageHeader title={`Welcome, ${a.name.split(" ")[0]}`} desc="Your membership with the Association of Junior Engineers, Punjab.">
@@ -128,6 +134,10 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
           <IdentificationCard size={18} weight="bold" /> Membership Card (PDF)
         </a>
       </PageHeader>
+      {RAZORPAY_ENABLED && a.pvcCardRequested && (cardPaid
+        ? <p className="mb-5 rounded-lg bg-accent-soft p-3 text-sm font-semibold text-accent">PVC card payment received: Rs.200/-.</p>
+        : <div className="mb-5"><RazorpayPayment applicationId={a.id} purpose="pvc_card" amount={PVC_CARD_PAISE} pvcAmount={PVC_CARD_PAISE}
+            initialStatus={cardCharge?.status} initialPaymentId={cardCharge?.razorpayPaymentId} /></div>)}
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         {/* Member card */}
         <div className="card relative overflow-hidden p-6">
@@ -160,6 +170,7 @@ async function MemberHome({ applicationId }: { applicationId: string | null }) {
             <Detail label="Mobile" value={a.contact} />
             <Detail label="Email" value={a.email} />
             <Detail label="Qualification" value={`${a.qualification} (${a.discipline})`} />
+            <Detail label="Blood Group" value={a.bloodGroup ?? "Not recorded"} />
             <Detail label="Zone" value={a.zone} />
             <Detail label="Division" value={a.division} />
             <Detail label="Sub Division" value={a.subDivision} />

@@ -1,11 +1,11 @@
 # AOJ Punjab — Membership Portal
 
 Online membership portal for the **Association of Junior Engineers, Punjab (PSPCL/PSTCL) (Regd.)**,
-Licence No. PB41/253/351836, "Engineers' Square" 20E/5, Tripuri Town, Patiala.
+Licence No. PB41/253/351836, H.Q. 67-C Ranjit Nagar Near Tiwana Chownk Patiala (147001).
 
 A Junior Engineer opens the registration link, fills the membership form (same fields as the paper form) with a
 passport-size photo, and receives a membership number, login ID and password once the Operation Team approves.
-**No online payment**: the subscription is deducted from salary, as stated in the form's declaration.
+New applicants pay their selected membership fee through Razorpay before approval. A physical PVC card can be paid for with membership or after approval.
 
 ## Objectives
 
@@ -67,6 +67,15 @@ npm run dev                   # http://localhost:3000
 npm run check                 # self-checks for password/CSV helpers
 ```
 
+## Membership fees and card requests
+
+The form offers monthly membership at Rs.200/- and yearly membership at Rs.2000/-.
+Members may request a card by email and optionally a physical PVC card for a one-time Rs.200/- charge including printing and delivery.
+Physical card payment preferences are mutually exclusive: pay now or pay later. Verified payment records are separate from the saved card preference.
+Staff can review both choices in the saved form and application list; admin CSV exports include them.
+Before deploying against an existing database, run `node scripts/add-pvc-card.mjs` and `node scripts/add-card-preferences.mjs`.
+Both migrations are additive and safe to rerun. Older subscription amounts remain valid for corrections to existing applications.
+
 ## Dashboards (`/dashboard`)
 
 | Page | Admin | Operation Team | Member |
@@ -80,6 +89,16 @@ npm run check                 # self-checks for password/CSV helpers
 
 Approving an application issues `AOJ-0001`-style membership numbers and a member login (`aoj0001`) with a
 generated password, shown once to the reviewer to share. Photos are served only to staff and the member.
+
+## Blood group on membership cards
+
+New applicants select their blood group in Personal Details, including a "Not known" option.
+Existing applications can remain blank until an admin updates them. Blood group is shown on the ID card, member details and CSV exports.
+Run `node scripts/add-blood-group.mjs` once against an existing database before running this version of the app.
+
+## Corresponding address
+
+New registration forms require a Corresponding Address. Staff can view it, admins can correct it with an audit trail, and it is included in CSV exports. Run `node scripts/add-corresponding-address.mjs` once against an existing database before running this version of the app. Earlier applications can retain a blank address.
 
 ## Membership card (PDF)
 
@@ -119,3 +138,22 @@ four templates on your DLT portal, add them in MSG91 with the same variable name
 - [x] **Phase 3**: email/SMS notifications with delivery log
 - [x] **Phase 4**: printable membership card PDF
 - [ ] **Next**: login rate limiting, card verification QR code
+
+## Razorpay payments
+
+**Currently paused:** `RAZORPAY_ENABLED` in `src/lib/payment-rules.ts` is `false`. Registration saves applications without creating charges or payment access cookies, payment options and panels are hidden, and staff can approve directly without checking payment. Payment endpoints are disabled. The integration code and existing payment records are retained; set the flag to `true` when ready to restore the flow below.
+
+When online payments are enabled, registration collects Rs.200/- monthly or Rs.2,000/- yearly, plus Rs.200/- only when physical PVC card **pay now** is selected. Email card delivery adds no charge. **Pay later** collects membership now and offers the Rs.200/- card payment on the approved member dashboard. This integration collects one selected membership period; it does not create recurring subscriptions.
+
+1. Run `node scripts/add-payments.mjs` against an existing database before deploying. The additive migration preserves existing applications, which may still be approved without a payment ledger.
+2. Add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` from `.env.example` to `.env.local` or Vercel's Production environment. Use matching test credentials during testing, then live credentials. Keep secret values server-side; never prefix them with `NEXT_PUBLIC_`.
+3. In Razorpay Dashboard, enable automatic capture and configure `https://aoj-portal.vercel.app/api/payments/razorpay/webhook` with the same webhook secret. Subscribe to `payment.captured`, `payment.authorized`, `payment.failed`, `order.paid` and `refund.processed`.
+4. Redeploy after changing Vercel environment variables. Test the complete flow with Razorpay test mode before switching to live mode.
+
+Applications and charge records are saved atomically before checkout. Cancellation or gateway outages leave the application saved. The original browser can resume at `/register/payment` for seven days using a signed HttpOnly cookie. Approved members access their own card payment through their login. Checkout retries reuse the same order and recover interrupted order creation by its receipt.
+
+The server calculates charges, verifies the checkout signature against its stored order, and fetches the gateway payment to check its amount, currency and capture status. Signed webhooks reconcile captures and refunds; duplicate or older events cannot downgrade confirmed payments. Admins see payment status, amounts and gateway references on applications and CSV exports. If the registration charge is unpaid, reviewers must confirm "Payment is not received. Are you sure you want to accept the application?" before approval. Approval does not mark the charge as paid. Financial choices are fixed once a charge is recorded.
+
+If keys or the webhook secret are missing, checkout displays a temporary-unavailability message; registration remains saved. Payment processing is not active until all three settings are configured.
+
+Run `npm run check:payments` for isolated payment tests; these use mock gateway responses and never charge or notify anyone.

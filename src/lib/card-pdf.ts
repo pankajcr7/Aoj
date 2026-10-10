@@ -19,6 +19,9 @@ import {
 export type CardData = {
   name: string;
   fatherName: string;
+  address: string;
+  division: string;
+  subDivision: string;
   designation: string;
   company: string;
   employeeId: string;
@@ -27,6 +30,7 @@ export type CardData = {
   circle: string;
   zone: string;
   contact: string;
+  bloodGroup?: string | null;
   photo: Uint8Array;
   photoType: string;
   signature?: Uint8Array | null;
@@ -99,7 +103,7 @@ function shape(page: PDFPage, x: number, y: number, d: string, color: RGB) {
 }
 
 /** Draws `img` cropped to a circle (cover-fit, no stretching) of radius r centred on (cx, cy). */
-function circleImage(page: PDFPage, img: PDFImage, cx: number, cy: number, r: number) {
+function circleImage(page: PDFPage, img: PDFImage, cx: number, cy: number, r: number, align: "center" | "top" = "center") {
   const k = r * 0.5523; // bezier handle length for a quarter circle
   page.pushOperators(
     pushGraphicsState(),
@@ -114,7 +118,7 @@ function circleImage(page: PDFPage, img: PDFImage, cx: number, cy: number, r: nu
   );
   const s = Math.max((2 * r) / img.width, (2 * r) / img.height);
   const w = img.width * s, h = img.height * s;
-  page.drawImage(img, { x: cx - w / 2, y: cy - h / 2 + (h - 2 * r) * 0.15, width: w, height: h }); // bias up: keep faces in frame
+  page.drawImage(img, { x: cx - w / 2, y: align === "top" ? cy + r - h : cy - h / 2, width: w, height: h });
   page.pushOperators(popGraphicsState());
 }
 
@@ -163,23 +167,18 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: 
   // Logo + name of the association
   page.drawCircle({ x: x + mm(8.5), y: top(8), size: mm(5), color: WHITE });
   circleImage(page, img.logo, x + mm(8.5), top(8), mm(4.6));
-  page.drawText("AOJE", { x: x + mm(15.5), y: top(8.4), size: 13, font: f.bold, color: YELLOW });
-  page.drawText("Punjab", { x: x + mm(15.5) + f.bold.widthOfTextAtSize("AOJE ", 13), y: top(8.4), size: 13, font: f.bold, color: WHITE });
-  text(page, "Association of Junior Engineers", x + mm(15.5), top(11.6), f.reg, 5.4, WHITE, W - mm(18));
+  text(page, "AOJE (PSPCL/PSTCL) Regd.", x + mm(15.5), top(6.5), f.bold, 7.8, YELLOW, W - mm(18));
+  text(page, "Association of Junior Engineers", x + mm(15.5), top(9.4), f.reg, 5.4, WHITE, W - mm(18));
+  text(page, "Union Registration No. PB41/253/351836", x + mm(15.5), top(12), f.reg, 4.8, WHITE, W - mm(18));
 
   // Photo in a red ring
   const pr = mm(11), pcy = top(38.5);
   page.drawCircle({ x: cx, y: pcy, size: pr + mm(1.6), color: RED });
   page.drawCircle({ x: cx, y: pcy, size: pr + mm(0.8), color: WHITE });
-  circleImage(page, img.photo, cx, pcy, pr);
+  circleImage(page, img.photo, cx, pcy, pr, "top");
 
-  // Name: first word red, the rest navy
-  const nf = fit(d.name, f.bold, 13, W - mm(6));
-  const [first, ...rest] = nf.t.split(" ");
-  const restText = rest.length ? ` ${rest.join(" ")}` : "";
-  const nameW = f.bold.widthOfTextAtSize(first + restText, nf.size);
-  page.drawText(first, { x: cx - nameW / 2, y: top(55.6), size: nf.size, font: f.bold, color: RED });
-  if (restText) page.drawText(restText, { x: cx - nameW / 2 + f.bold.widthOfTextAtSize(first, nf.size), y: top(55.6), size: nf.size, font: f.bold, color: NAVY });
+  // Keep the full member name in one consistent colour.
+  centred(page, d.name, cx, top(55.6), f.bold, 13, NAVY);
   centred(page, d.designation, cx, top(59.2), f.bold, 7.2, INK);
 
   // Membership number bar: red label tab (sized to its text) + navy band
@@ -195,7 +194,7 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: 
   // Details
   centred(page, `Employee ID: ${d.employeeId}`, cx, top(71), f.reg, 6.4, INK);
   centred(page, `Mobile: ${d.contact}`, cx, top(74.4), f.reg, 6.4, INK);
-  centred(page, d.company, cx, top(77.6), f.bold, 5.6, MUTED, W - mm(24));
+  centred(page, `${d.company} | Blood Group: ${d.bloodGroup || "Not recorded"}`, cx, top(77.6), f.bold, 5.6, INK, W - mm(24));
 
   barcode(page, d.membershipNo, x + mm(20), top(83.4), mm(4.2), mm(28));
 }
@@ -204,55 +203,76 @@ function back(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: I
   page.drawRectangle({ x, y, width: W, height: H, color: WHITE });
   const top = (v: number) => y + H - mm(v);
   const cx = x + W / 2;
-  const lx = x + mm(5), vw = W - mm(10);
+  const lx = x + mm(4), vw = W - mm(8);
 
-  // Top-right corner sweep
-  shape(page, x, y, "M24 0 H54 V9 C44 9 36 4 24 0 Z", NAVY);
-  shape(page, x, y, "M20 0 H24 C36 4 44 9 54 9 V12 C42 12 33 6 20 0 Z", RED);
+  shape(page, x, y, "M24 0 H54 V7 C44 7 36 4 24 0 Z", NAVY);
+  shape(page, x, y, "M20 0 H24 C36 4 44 7 54 7 V9 C42 9 33 6 20 0 Z", RED);
 
-  const rows: [string, string | null][] = [
-    ["Father's Name", d.fatherName],
-    ["Organisation", d.company],
-    ["Present Posting", d.posting], // older applications may not have it
-    ["Circle", d.circle],
-    ["Zone", d.zone],
-    ["Mobile", d.contact],
+  const rows: [string, string | null, number][] = [
+    ["Father's Name", d.fatherName, 1],
+    ["Address", d.address, 2],
+    ["Organisation", d.company, 1],
+    ["Current Posting", d.posting, 2],
+    ["Division", d.division, 1],
+    ["Sub Division", d.subDivision, 1],
+    ["Circle", d.circle, 1],
+    ["Zone", d.zone, 1],
+    ["Mobile", d.contact, 1],
   ];
-  let ry = 13; // mm from the top; long values take two lines (fits 6 rows with 2 of them wrapped)
-  for (const [label, value] of rows) {
-    if (!value) continue;
-    text(page, `${label}:`, lx, top(ry), f.bold, 5.9, NAVY);
-    const lines = wrap(value, f.reg, 6.2, vw);
-    lines.forEach((l, j) => text(page, l, lx, top(ry + 2.6 + j * 2.45), f.reg, 6.2, INK, vw));
-    ry += 2.3 + lines.length * 2.6;
+  let ry = 10;
+  for (const [label, value, maxLines] of rows) {
+    const prefix = `${label}: `;
+    const prefixWidth = f.bold.widthOfTextAtSize(prefix, 5.6);
+    const lines = wrap(value || "-", f.reg, 5.6, vw - prefixWidth, maxLines);
+    text(page, prefix, lx, top(ry), f.bold, 5.6, NAVY);
+    for (const line of lines) {
+      text(page, line, lx + prefixWidth, top(ry), f.reg, 5.6, INK, vw - prefixWidth);
+      ry += 2.7;
+    }
   }
 
-  // Signatures: member (left), General Secretary (right)
-  const sy = top(56);
+  const termsTop = Math.max(37, ry + 1);
+  centred(page, "TERMS & CONDITIONS", cx, top(termsTop), f.bold, 6.5, NAVY, vw);
+  page.drawLine({ start: { x: lx, y: top(termsTop + 1) }, end: { x: lx + vw, y: top(termsTop + 1) }, thickness: 0.35, color: LINE });
+  const terms = [
+    "This card is the property of the Association of Jr.Engineers and is non-transferable.",
+    "If lost, it must be reported immediately to the issuing authority.",
+  ];
+  const termWidth = vw - mm(2.5);
+  let termSize = 5.4;
+  let termLines = terms.map((term) => wrap(term, f.reg, termSize, termWidth, 80));
+  const termsHeight = () => termLines.reduce((sum, lines) => sum + lines.length * termSize * 1.25, 0) + mm(2);
+  while (termsHeight() > mm(60 - termsTop - 3.5) && termSize > 4.8) {
+    termSize -= 0.1;
+    termLines = terms.map((term) => wrap(term, f.reg, termSize, termWidth, 80));
+  }
+  let ty = top(termsTop + 3.5);
+  termLines.forEach((lines, i) => {
+    text(page, `${i + 1}.`, lx, ty, f.bold, termSize, INK);
+    lines.forEach((line) => {
+      text(page, line, lx + mm(2.5), ty, f.reg, termSize, INK, termWidth);
+      ty -= termSize * 1.25;
+    });
+    if (i < termLines.length - 1) ty -= mm(1);
+  });
+
+  const sy = top(65);
   const half = (vw - mm(4)) / 2;
   for (const [i, sign, label] of [[0, img.signature, "Member"], [1, img.authority, "General Secretary"]] as const) {
     const sx = lx + i * (half + mm(4));
-    if (sign) fitImage(page, sign, sx + half / 2, sy + mm(0.5), half, mm(6.5));
+    if (sign) fitImage(page, sign, sx + half / 2, sy + mm(0.5), half, mm(4));
     page.drawLine({ start: { x: sx, y: sy }, end: { x: sx + half, y: sy }, thickness: 0.4, color: LINE });
-    centred(page, label, sx + half / 2, sy - mm(2.6), f.reg, 5, MUTED, half);
+    centred(page, label, sx + half / 2, sy - mm(2.3), f.reg, 4.8, MUTED, half);
   }
 
-  // Return address
-  text(page, "If found, please return the card to:", lx, top(62.5), f.reg, 5.6, MUTED, vw);
-  text(page, "ASSOCIATION OF JUNIOR ENGINEERS, PUNJAB", lx, top(65.6), f.bold, 6, RED, vw);
-  text(page, "Engineers' Square, 20E/5, Ground Floor,", lx, top(68.4), f.reg, 5.4, INK, vw);
-  text(page, "Tripuri Town, Patiala, Punjab", lx, top(70.9), f.reg, 5.4, INK, vw);
-
-  // Navy footer with a red sweep and the logo
-  shape(page, x, y, "M0 75 C16 70 34 73 54 69 V85.6 H0 Z", RED);
-  shape(page, x, y, "M0 77.5 C16 72.5 34 75.5 54 71.5 V85.6 H0 Z", NAVY);
-  page.drawCircle({ x: x + mm(11), y: top(80.2), size: mm(3.6), color: WHITE });
-  circleImage(page, img.logo, x + mm(11), top(80.2), mm(3.3));
-  page.drawText("AOJE", { x: x + mm(16.5), y: top(81.4), size: 11, font: f.bold, color: YELLOW });
-  page.drawText("Punjab", { x: x + mm(16.5) + f.bold.widthOfTextAtSize("AOJE ", 11), y: top(81.4), size: 11, font: f.bold, color: WHITE });
-  centred(page, "(PSPCL/PSTCL) Regd.", cx + mm(5), top(84), f.reg, 4.6, WHITE);
+  text(page, "If found, please return to AOJE Punjab:", lx, top(71), f.reg, 5.2, NAVY, vw);
+  text(page, "Contact Number: 8288091003", lx, top(73.5), f.reg, 5, INK, vw);
+  text(page, "Email: aojepunjab.portal@gmail.com", lx, top(76), f.reg, 5, INK, vw);
+  text(page, "H.Q. 67-C Ranjit Nagar", lx, top(78.5), f.reg, 5, INK, vw);
+  text(page, "Near Tiwana Chownk Patiala (147001)", lx, top(81), f.reg, 5, INK, vw);
+  page.drawRectangle({ x, y, width: W, height: mm(3.5), color: NAVY });
+  centred(page, "AOJE Punjab (PSPCL/PSTCL) Regd.", cx, top(84.3), f.bold, 5.8, WHITE, vw);
 }
-
 function cropMarks(page: PDFPage, x: number, y: number, w: number, h: number) {
   const len = mm(4), gap = mm(1.5), opts = { thickness: 0.4, color: MUTED };
   for (const [cx, cy, dx, dy] of [[x, y, -1, -1], [x + w, y, 1, -1], [x, y + h, -1, 1], [x + w, y + h, 1, 1]] as const) {

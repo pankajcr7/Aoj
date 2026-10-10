@@ -25,9 +25,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState, useTransition } from "react";
-import { DESIGNATIONS, DISCIPLINES, HEADQUARTERS, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS, ZONES } from "@/lib/form-options";
+import { BLOOD_GROUPS, DESIGNATIONS, DISCIPLINES, HEADQUARTERS, LEGACY_MEMBERSHIP_TYPES, MEMBERSHIP_TYPES, QUALIFICATIONS, ZONES } from "@/lib/form-options";
 import { updateApplication } from "@/app/dashboard/actions";
-import { register, type FormErrors } from "./actions";
+import { RazorpayPayment } from "@/components/razorpay-payment";
+import { RAZORPAY_ENABLED, registrationCharge, money } from "@/lib/payment-rules";
+import { register, type FormErrors, type RegisterState } from "./actions";
 import { ImageCropper } from "./image-cropper";
 
 const script = Kaushan_Script({ weight: "400", subsets: ["latin"] });
@@ -103,6 +105,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
   const [message, setMessage] = useState("");
   const [name, setName] = useState(v?.name ?? "");
   const [hq, setHq] = useState(v?.headquarters ?? "");
+  const [membershipType, setMembershipType] = useState(v?.membershipType ?? "");
   const savedPhoto = saved && { url: `/api/photo/${saved.id}`, name: "" };
   const savedSignature = saved?.hasSignature ? { url: `/api/photo/${saved.id}?signature`, name: "" } : undefined;
   const [photo, setPhoto] = useState<Preview | undefined>(savedPhoto);
@@ -116,7 +119,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
     aspect: number;
     title: string;
   }>();
-  const [done, setDone] = useState<{ ref?: string }>();
+  const [done, setDone] = useState<RegisterState>();
   const [pending, startTransition] = useTransition();
 
   function submit(ev: React.FormEvent<HTMLFormElement>) {
@@ -152,7 +155,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
           return;
         }
         const res = await register({}, data);
-        if (res.ok) return setDone({ ref: res.ref });
+        if (res.ok) return setDone(res);
         setErrors(res.errors ?? {});
         setMessage(res.message ?? "Please check the highlighted fields.");
       } catch {
@@ -167,6 +170,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
     setMessage("");
     setName(v?.name ?? "");
     setHq(v?.headquarters ?? "");
+    setMembershipType(v?.membershipType ?? "");
     setPhoto(savedPhoto);
     setSignature(savedSignature);
   }
@@ -209,7 +213,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
     }
   }
 
-  if (done) return <Success refNo={done.ref} />;
+  if (done) return <Success refNo={done.ref} payment={done.payment} />;
 
   const e = errors;
 
@@ -270,8 +274,15 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
               <Text name="email" e={e} type="email" autoComplete="email" placeholder="you@example.com" />
               <Row label="Date of Birth" req htmlFor="dob" />
               <Text name="dob" e={e} type="date" max={today()} className="sm:max-w-[196px]" />
+              <Row label="Blood Group" req={!ro} htmlFor="bloodGroup" />
+              <Select name="bloodGroup" e={e} defaultValue="" required={!ro} className="sm:max-w-[196px]">
+                <option value="">Select Blood Group</option>
+                {BLOOD_GROUPS.map((group) => <option key={group}>{group}</option>)}
+              </Select>
               <Row label="Residential Address" req htmlFor="address" className="self-start pt-1.5" />
               <Text name="address" e={e} textarea rows={2} className="h-[56px]" />
+              <Row label="Corresponding Address" req={!ro} htmlFor="correspondingAddress" className="self-start pt-1.5" />
+              <Text name="correspondingAddress" e={e} textarea rows={2} required={!ro} maxLength={300} className="h-[56px]" />
               <Row label="Pin Code" req htmlFor="pinCode" />
               <Text
                 name="pinCode"
@@ -352,7 +363,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
           </Panel>
 
           <Panel className="divide-y divide-[#cfdcee] bg-[#eef5fe] px-4 py-2">
-            <Info icon={Buildings} title="Headquarters">
+            <Info icon={Buildings} title="Headquarters (Optional)">
               <input
                 list="headquarters-list"
                 aria-label="Headquarters"
@@ -413,20 +424,22 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                   <Stack label="Email (Official)" name="officialEmail">
                     <Text name="officialEmail" e={e} type="email" required={false} />
                   </Stack>
-                  <Stack label="Headquarters" req name="headquarters">
+                  <Stack label="Headquarters (Optional)" name="headquarters">
                     <Text
                       name="headquarters"
                       e={e}
+                      required={false}
                       list="headquarters-list"
                       value={hq}
                       onChange={(ev) => setHq(ev.target.value)}
                       placeholder="Select or type headquarters / office"
                     />
                   </Stack>
-                  <Stack label="Posting / Office" req name="posting">
+                  <Stack label="Posting / Office (Optional)" name="posting">
                     <Text
                       name="posting"
                       e={e}
+                      required={false}
                       textarea
                       rows={2}
                       className="h-[46px]"
@@ -479,14 +492,15 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
               <Head n={3} title="Membership Details" icon={IdentificationCard} />
               <div className={`grid grid-cols-1 gap-4 p-4 ${ro ? "md:grid-cols-[1fr_215px]" : "md:max-w-[620px]"}`}>
                 <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 sm:grid-cols-[140px_1fr] sm:items-center">
-                  <Row label="Membership Type" htmlFor="membershipType" />
-                  <Select name="membershipType" id="membershipType" e={e} defaultValue="" required={false}>
+                  <Row label="Membership Type" htmlFor="membershipType" req={!ro} />
+                  <Select name="membershipType" id="membershipType" e={e} defaultValue="" required={!ro} onChange={(ev) => setMembershipType(ev.target.value)} disabled={RAZORPAY_ENABLED && editing && v?.paymentRecorded === "true"}>
                     <option value="">Select Membership Type</option>
                     {/* An older application keeps its retired type as an option, so corrections don't blank it. */}
                     {[...MEMBERSHIP_TYPES, ...LEGACY_MEMBERSHIP_TYPES.filter((m) => m === v?.membershipType)].map((m) => (
                       <option key={m}>{m}</option>
                     ))}
                   </Select>
+                  {RAZORPAY_ENABLED && editing && v?.paymentRecorded === "true" && <input type="hidden" name="membershipType" value={v?.membershipType ?? ""} />}
                   <Row label="Date of Application" htmlFor="appDate" />
                   <input id="appDate" type="date" value={v?.createdAt ?? today()} readOnly className={INP} />
                 </div>
@@ -501,6 +515,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
                   </div>
                 )}
               </div>
+              <CardOptions key={editing ? "editing" : "viewing"} e={e} membershipType={membershipType} />
             </Panel>
           </div>
 
@@ -659,7 +674,7 @@ export function MembershipForm({ saved, office }: { saved?: SavedApplication; of
               I, <strong>{name.trim() || "the applicant"}</strong>, solemnly affirm that I want to be a member of the
               “Association of Junior Engineers”. I shall abide by the rules of its constitution and perform the duties assigned to
               me. I subscribe to the membership (as decided by the general house, including special contribution, if any) and
-              authorize the Association and PSPCL/PSTCL to deduct it from my salary. If I fail to pay for six consecutive months, my
+              agree to pay the selected membership fee{RAZORPAY_ENABLED ? " online" : ""}. If I fail to pay for six consecutive months, my
               membership may be ceased without notice.
               <FieldError msg={e.declarationAccepted} />
             </span>
@@ -747,6 +762,9 @@ function Banner() {
             Junior Engineers Punjab
           </h1>
           <p className="mt-1 text-[20px] font-bold sm:text-[30px]">(PSPCL/PSTCL) Regd.</p>
+          <p className="mt-1 text-[12px] leading-relaxed font-semibold sm:text-[14px]">
+            Union Registration No. PB41/253/351836, Dated: 03-10-2022
+          </p>
           <p className={`${script.className} mt-1 text-[20px] sm:text-[30px]`}>Together for a Stronger Tomorrow</p>
         </div>
         <div className="hidden text-center text-white md:block">
@@ -982,6 +1000,68 @@ function Radio({ name, label, checked }: { name: string; label: string; checked?
   );
 }
 
+function CardOptions({ e, membershipType }: { e: Errors; membershipType: string }) {
+  const saved = useContext(Saved);
+  const [email, setEmail] = useState(saved?.values.cardEmailRequested === "true");
+  const [payment, setPayment] = useState(saved?.values.pvcCardPayment ?? "");
+  const [physicalCard, setPhysicalCard] = useState(saved?.values.pvcCardRequested === "true");
+  const locked = !!saved?.locked;
+  const fixedPayment = saved?.values.paymentRecorded === "true";
+  const selectedEmail = locked ? saved?.values.cardEmailRequested === "true" : email;
+  const selectedPayment = locked ? saved?.values.pvcCardPayment ?? "" : payment;
+  const charge = registrationCharge(membershipType, selectedPayment);
+  if (!RAZORPAY_ENABLED) return (
+    <fieldset disabled={locked} className="mx-4 mb-4 rounded-md border border-[#c6d9f1] bg-[#f4f8fd] p-3">
+      <legend className="px-1 text-[14px] font-bold" style={{ color: NAVY }}>Membership Card (Optional)</legend>
+      <div className="space-y-2 text-[13px] leading-relaxed">
+        <label className="flex items-start gap-2">
+          <input type="checkbox" id="cardEmailRequested" name="cardEmailRequested" value="on" checked={selectedEmail}
+            onChange={(ev) => setEmail(ev.target.checked)} className="mt-1 size-4 shrink-0 accent-[#0b2c6e]" />
+          <span>I want my membership card by email.</span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" id="pvcCardRequested" name="pvcCardRequested" value="on" checked={locked ? saved?.values.pvcCardRequested === "true" : physicalCard}
+            onChange={(ev) => setPhysicalCard(ev.target.checked)} className="mt-1 size-4 shrink-0 accent-[#0b2c6e]" />
+          <span>I want a physical PVC membership card.</span>
+        </label>
+      </div>
+    </fieldset>
+  );
+  return (
+    <fieldset disabled={locked} className="mx-4 mb-4 rounded-md border border-[#c6d9f1] bg-[#f4f8fd] p-3">
+      <legend className="px-1 text-[14px] font-bold" style={{ color: NAVY }}>Membership Card (Optional)</legend>
+      <p className="mb-2 text-[12px] leading-relaxed text-[#4a5a72]">
+        Select up to two options: email delivery and one physical card payment option.
+        The physical PVC card costs Rs.200/- once, including printing and delivery.
+      </p>
+      <input type="hidden" name="pvcCardPayment" value={selectedPayment} />
+      <div className="space-y-2 text-[13px] leading-relaxed">
+        <label className="flex items-start gap-2">
+          <input type="checkbox" id="cardEmailRequested" name="cardEmailRequested" value="on" checked={selectedEmail}
+            onChange={(ev) => setEmail(ev.target.checked)} className="mt-1 size-4 shrink-0 accent-[#0b2c6e]" />
+          <span>I want my membership card by email.</span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" id="pvcCardPayNow" disabled={fixedPayment} checked={selectedPayment === "pay_now"}
+            onChange={(ev) => setPayment(ev.target.checked ? "pay_now" : "")} className="mt-1 size-4 shrink-0 accent-[#0b2c6e]" />
+          <span>I want a physical PVC card - pay now (Rs.200/-).</span>
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" id="pvcCardPayLater" disabled={fixedPayment} checked={selectedPayment === "pay_later"}
+            onChange={(ev) => setPayment(ev.target.checked ? "pay_later" : "")} className="mt-1 size-4 shrink-0 accent-[#0b2c6e]" />
+          <span>I want a physical PVC card - pay later (Rs.200/-).</span>
+        </label>
+      </div>
+      {!saved && charge && <p className="mt-3 border-t border-[#c6d9f1] pt-2 text-[13px] font-bold">Pay now total: {money(charge.amount)}{charge.pvcAmount > 0 ? " (membership + PVC card)" : " (membership fee)"}</p>}
+      <FieldError msg={e.cardEmailRequested} />
+      <FieldError msg={e.pvcCardPayment} />
+      {saved?.values.pvcCardRequested === "true" && !selectedPayment && (
+        <p className="mt-2 text-[12px] text-[#4a5a72]">Previous PVC card request: payment preference not recorded.</p>
+      )}
+    </fieldset>
+  );
+}
+
 function MembershipNo({ value, className = "" }: { value?: string | null; className?: string }) {
   return (
     <span
@@ -1002,7 +1082,7 @@ function FieldError({ msg, center }: { msg?: string[]; center?: boolean }) {
   ) : null;
 }
 
-function Success({ refNo }: { refNo?: string }) {
+function Success({ refNo, payment }: { refNo?: string; payment?: RegisterState["payment"] }) {
   return (
     <div className="card mx-auto max-w-xl p-10 text-center">
       <span className="mx-auto grid size-20 place-items-center rounded-full bg-accent-soft text-accent">
@@ -1015,9 +1095,11 @@ function Success({ refNo }: { refNo?: string }) {
         </p>
       )}
       <p className="mx-auto mt-3 max-w-md text-muted">
-        Thank you. We have sent a confirmation to your email and mobile. Once the Operation Team approves your application,
-        your membership number, login ID and password will be sent the same way.
+        {RAZORPAY_ENABLED ? "Your application is saved. Complete your membership payment below. " : "Your application is saved. "}
+        Once the Operation Team approves your application, your membership number, login ID and password will be sent by email and SMS.
       </p>
+      {RAZORPAY_ENABLED && payment && <RazorpayPayment {...payment} purpose="registration" />}
+      {RAZORPAY_ENABLED && <Link href="/register/payment" className="mt-4 block text-sm font-semibold text-accent underline">Return to this payment page</Link>}
       <Link href="/" className="btn-accent mt-8 px-6 py-3">
         Back to Home
       </Link>
