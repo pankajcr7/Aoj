@@ -1,29 +1,7 @@
-import {
-  Check,
-  CurrencyInr,
-  Lightning,
-  ListChecks,
-  MapPin,
-  Phone,
-  UsersThree,
-} from "@phosphor-icons/react/ssr";
+import { Check, ListChecks, Phone, UsersThree } from "@phosphor-icons/react/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import { Logo, SiteHeader } from "@/components/site-header";
-import { RAZORPAY_ENABLED } from "@/lib/payment-rules";
-
-const facts = [
-  { icon: Lightning, title: "PSPCL & PSTCL", sub: "Both corporations" },
-  { icon: MapPin, title: "6 Zones", sub: "Across Punjab" },
-  { icon: CurrencyInr, title: "Rs.200 / month", sub: "Or Rs.2,000 / year" },
-];
-
-const steps = [
-  { title: "Fill in the Form", body: "Your personal, service and posting details, on a phone or computer.", img: "/images/step-1.jpg", tile: "bg-night" },
-  { title: RAZORPAY_ENABLED ? "Photo & Payment" : "Photo & Submit", body: RAZORPAY_ENABLED ? "Upload your photo, accept the declaration and pay your selected membership fee." : "Upload your photo, accept the declaration and submit your application.", img: "/images/step-machinery.jpg", tile: "bg-violet" },
-  { title: "Verification", body: "The Operation Team checks your details against employee records.", img: "/images/step-3.jpg", tile: "bg-brand" },
-  { title: "Receive Your Login", body: "Membership number, login ID and password by email and SMS.", img: "/images/step-lab.jpg", tile: "bg-night" },
-];
 
 const membership = [
   {
@@ -104,7 +82,7 @@ export default function Home() {
                 className="rise mt-4 font-display text-[2.6rem] leading-[1.12] font-semibold tracking-tight sm:text-[3.6rem]"
                 style={{ "--i": 1 } as React.CSSProperties}
               >
-                One Voice for Punjab&apos;s Power Engineers
+                One Voice for Punjab&apos;s Power Junior Engineers
               </h1>
               <p className="rise mt-6 max-w-md text-[15px] text-muted" style={{ "--i": 2 } as React.CSSProperties}>
                 The Association of Junior Engineers, Punjab represents Junior Engineers of PSPCL and PSTCL. Apply for membership
@@ -138,81 +116,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Facts */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <ul className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {facts.map(({ icon: Icon, title, sub }, n) => (
-              <li key={title} className="reveal flex items-center gap-4" style={{ "--i": n } as React.CSSProperties}>
-                <span className={`slant grid h-12 w-[68px] shrink-0 place-items-center text-white ${n % 2 ? "bg-night" : "bg-brand"}`}>
-                  <Icon size={22} weight="bold" />
-                </span>
-                <span>
-                  <span className="block font-display text-lg leading-tight font-bold">{title}</span>
-                  <span className="block text-sm text-muted">{sub}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* How it works */}
-        <section id="how-it-works" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
-          <Heading title="How It Works" body="The paper membership form, now online. Four steps from the form to your member login.">
-            <Link href="/register" className="btn-accent">
-              Start Now
-            </Link>
-          </Heading>
-          <ol className="mt-10 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-            {steps.map((s, n) => (
-              <li key={s.title} className="reveal" style={{ "--i": n } as React.CSSProperties}>
-                <div className="relative h-56">
-                  <div aria-hidden className={`slant-soft absolute inset-0 ${s.tile}`} />
-                  <div className="slant-soft absolute inset-x-5 top-5 bottom-0 overflow-hidden">
-                    <Image src={s.img} alt="" fill sizes="(min-width: 1024px) 270px, (min-width: 640px) 50vw, 100vw" className="object-cover" />
-                  </div>
-                </div>
-                <p className="mt-5 flex items-center gap-2 text-xs font-semibold text-muted">
-                  <Dash /> Step 0{n + 1}
-                </p>
-                <h3 className="mt-1.5 font-display text-lg font-bold">{s.title}</h3>
-                <p className="mt-1 text-sm text-muted">{s.body}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        {/* Promo band */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="reveal relative overflow-hidden rounded-2xl bg-night text-white">
-            <div aria-hidden className="slant absolute top-0 -right-14 hidden h-full w-32 bg-white/[0.06] lg:block" />
-            <div className="relative grid lg:min-h-[340px] lg:grid-cols-[1fr_1.1fr]">
-              <div className="relative h-60 lg:h-auto">
-                <div aria-hidden className="slant absolute inset-y-0 -left-16 right-14 bg-brand" />
-                <div className="slant absolute inset-y-0 -left-6 right-0 overflow-hidden">
-                  <Image src="/images/towers.jpg" alt="High-voltage transmission towers at sunset" fill sizes="(min-width: 1024px) 520px, 100vw" className="object-cover" />
-                </div>
-              </div>
-              <div className="flex flex-col justify-center px-8 py-10 lg:px-12">
-                <h2 className="max-w-md font-display text-3xl leading-tight font-bold sm:text-4xl">Registration Takes About Ten Minutes.</h2>
-                <p className="mt-4 text-sm text-white/70">
-                  Membership: <span className="font-semibold text-white">Rs.200/- monthly or Rs.2,000/- yearly</span>
-                  <span className="mt-1 block">Optional physical PVC card: Rs.200/- including printing and delivery.</span>
-                </p>
-                <div className="mt-7 flex flex-wrap gap-3">
-                  <Link href="/register" className="btn-brand px-5 py-2.5">
-                    Apply Now
-                  </Link>
-                  <Link href="/login" className="btn border border-white/30 px-5 py-2.5 text-white hover:bg-white/10">
-                    Member Login
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Membership */}
-        <section id="membership" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 sm:px-6">
+        <section id="membership" className="mx-auto max-w-6xl scroll-mt-32 px-4 py-16 sm:px-6 lg:scroll-mt-20">
           <Heading
             title="Membership Made Simple"
             body="Who can apply and what to keep ready for your membership application."
@@ -244,7 +149,7 @@ export default function Home() {
         </section>
 
         {/* State Body Leadership */}
-        <section id="leadership" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24 sm:px-6">
+        <section id="leadership" className="mx-auto max-w-6xl scroll-mt-32 px-4 py-24 sm:px-6 lg:scroll-mt-20">
           <Heading center title="State Body Leadership" body="The office-bearers of the Association of Junior Engineers, Punjab." />
           <div className="mx-auto mt-14 grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}>
             {heads.map((h) => (
@@ -286,7 +191,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer id="contact" className="border-t border-line">
+      <footer id="contact" className="scroll-mt-32 border-t border-line lg:scroll-mt-20">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1.2fr_1fr]">
           <div>
             <Logo />
@@ -314,6 +219,8 @@ export default function Home() {
             <div className="mt-4 space-y-2">
               <p className="text-xs text-muted">General Secretary</p>
               <Mobile n="86993-32052" />
+              <p className="pt-2 text-xs text-muted">State President</p>
+              <Mobile n="82880-91003" />
             </div>
           </div>
         </div>

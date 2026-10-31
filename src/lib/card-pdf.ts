@@ -235,7 +235,7 @@ function back(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: I
   centred(page, "TERMS & CONDITIONS", cx, top(termsTop), f.bold, 6.5, NAVY, vw);
   page.drawLine({ start: { x: lx, y: top(termsTop + 1) }, end: { x: lx + vw, y: top(termsTop + 1) }, thickness: 0.35, color: LINE });
   const terms = [
-    "This card is the property of the Association of Jr.Engineers and is non-transferable.",
+    "This card is the property of the Association of Junior Engineers and is non-transferable.",
     "If lost, it must be reported immediately to the issuing authority.",
   ];
   const termWidth = vw - mm(2.5);
