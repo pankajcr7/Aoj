@@ -7,9 +7,9 @@ import { latin1, membershipCardPdf } from "../src/lib/card-pdf.ts";
 import { PDFDocument } from "pdf-lib";
 import { readFileSync } from "node:fs";
 
-assert.equal(membershipNo(7), "AOJE-0007");
+assert.equal(membershipNo(930), "AOJE-930");
 assert.equal(membershipNo(12345), "AOJE-12345");
-assert.equal(memberLoginId(418), "aoj0418");
+assert.equal(memberLoginId(930), "aoj930");
 
 const pw = generatePassword();
 assert.equal(pw.length, 10);

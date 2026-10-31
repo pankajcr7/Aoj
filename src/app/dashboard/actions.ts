@@ -136,7 +136,7 @@ export async function createStaff(_: Credentials, formData: FormData): Promise<C
   await requireRole(["admin"]);
   const parsed = staffSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  if (/^aoj\d+$/.test(parsed.data.loginId)) return { error: "IDs like aoj0001 are reserved for members." };
+  if (/^aoj\d+$/.test(parsed.data.loginId)) return { error: "IDs like aoj930 are reserved for members." };
 
   const password = generatePassword();
   try {
