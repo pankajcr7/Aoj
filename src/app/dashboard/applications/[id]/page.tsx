@@ -9,7 +9,7 @@ import { applicationEdits, applications, notifications, payments, users } from "
 import { RAZORPAY_ENABLED, money, PAYMENT_LABELS } from "@/lib/payment-rules";
 import { FIELD_LABELS } from "@/lib/application-schema";
 import { requireRole, STAFF } from "@/lib/auth";
-import { AccountControls, MembershipControls, ReviewPanel } from "../../forms";
+import { AccountControls, MembershipControls, ReviewPanel, UnionDesignationForm } from "../../forms";
 import { StatusBadge } from "../../ui";
 
 const reviewer = alias(users, "reviewer");
@@ -88,6 +88,7 @@ export default async function ApplicationDetail({ params }: PageProps<"/dashboar
             {me.role === "admin" && (a.status === "approved" || a.status === "suspended" || a.status === "terminated") && (
               <div className="space-y-4">
                 <p className="text-sm font-medium">Membership (Master ID)</p>
+                <UnionDesignationForm applicationId={a.id} value={a.unionDesignation} />
                 <MembershipControls applicationId={a.id} status={a.status} />
                 {member?.id && a.status === "approved" && <AccountControls userId={member.id} active={member.active} noToggle />}
               </div>

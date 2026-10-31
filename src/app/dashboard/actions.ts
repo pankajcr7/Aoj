@@ -195,6 +195,23 @@ export async function setMembershipStatus(applicationId: string, _: Result, form
   return { ok: true };
 }
 
+/** Master ID (admin): the member's post in the union, printed on the ID card. Empty clears it. Audited. */
+export async function setUnionDesignation(applicationId: string, _: Result, formData: FormData): Promise<Result> {
+  const me = await requireRole(["admin"]);
+  const value = String(formData.get("unionDesignation") ?? "").trim().replace(/\s+/g, " ").slice(0, 60) || null;
+  const [cur] = await db.select({ unionDesignation: applications.unionDesignation }).from(applications).where(eq(applications.id, applicationId));
+  if (!cur) return { error: "Application not found." };
+  if ((cur.unionDesignation ?? null) === value) return { error: "Nothing was changed." };
+  await db.batch([
+    db.update(applications).set({ unionDesignation: value }).where(eq(applications.id, applicationId)),
+    db.insert(applicationEdits).values({
+      applicationId, field: "Union Designation", oldValue: cur.unionDesignation, newValue: value, remarks: null, changedBy: me.id,
+    }),
+  ]);
+  refresh();
+  return { ok: true };
+}
+
 export type EditResult = { ok?: boolean; message?: string; errors?: FormErrors };
 
 /** Master ID (admin) corrects a submitted form. Every changed field is logged to the audit trail. */

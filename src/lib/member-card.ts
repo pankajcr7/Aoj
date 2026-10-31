@@ -13,7 +13,7 @@ export async function memberCard(id: string): Promise<{ pdf: Uint8Array; filenam
     .select({
       name: a.name, fatherName: a.fatherName, designation: a.designation, company: a.company, employeeId: a.employeeId,
       address: a.address, division: a.division, subDivision: a.subDivision,
-      membershipNo: a.membershipNo, posting: a.posting, circle: a.circle, zone: a.zone, contact: a.contact, bloodGroup: a.bloodGroup,
+      membershipNo: a.membershipNo, unionDesignation: a.unionDesignation, posting: a.posting, circle: a.circle, zone: a.zone, contact: a.contact, bloodGroup: a.bloodGroup,
       photo: a.photo, photoType: a.photoType, signature: a.signature, signatureType: a.signatureType,
     })
     .from(a)

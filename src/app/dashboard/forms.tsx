@@ -11,6 +11,7 @@ import {
   resetPassword,
   setActive,
   setMembershipStatus,
+  setUnionDesignation,
   type Credentials,
   type Result,
 } from "./actions";
@@ -227,6 +228,34 @@ export function MembershipControls({ applicationId, status }: { applicationId: s
         ))}
       </div>
       <Alert msg={state.error} />
+    </form>
+  );
+}
+
+export function UnionDesignationForm({ applicationId, value }: { applicationId: string; value: string | null }) {
+  const [state, action, pending] = useActionState(setUnionDesignation.bind(null, applicationId), {} as Result);
+  return (
+    <form action={action} className="space-y-2" key={value ?? ""}>
+      <label htmlFor="unionDesignation" className="block text-sm font-medium">
+        Union designation (on ID card)
+      </label>
+      <div className="flex gap-2">
+        <input
+          id="unionDesignation"
+          name="unionDesignation"
+          defaultValue={value ?? ""}
+          maxLength={60}
+          placeholder="e.g. State President"
+          className="field"
+          autoComplete="off"
+        />
+        <button disabled={pending} className="btn-outline shrink-0 px-3 py-2 text-xs">
+          Save
+        </button>
+      </div>
+      <p className="text-xs text-muted">Leave empty to show no designation on the card.</p>
+      <Alert msg={state.error} />
+      {state.ok && <Alert tone="ok" msg="Saved." />}
     </form>
   );
 }

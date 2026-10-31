@@ -71,6 +71,7 @@ export const applications = pgTable("applications", {
 
   // "For office use only"
   membershipNo: text().unique(),
+  unionDesignation: text(), // Set by the admin (e.g. State President); printed on the ID card only when present.
   reviewedBy: uuid(),
   reviewedAt: timestamp({ withTimezone: true }),
   rejectionReason: text(),

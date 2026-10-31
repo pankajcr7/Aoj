@@ -26,6 +26,7 @@ export type CardData = {
   company: string;
   employeeId: string;
   membershipNo: string;
+  unionDesignation?: string | null;
   posting: string | null;
   circle: string;
   zone: string;
@@ -191,10 +192,13 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: 
   const nx = tabEnd + bh / 2 + mm(2.5);
   text(page, d.membershipNo, x + nx, by + mm(1.6), f.bold, 9.5, WHITE, W - nx - mm(2));
 
-  // Details
-  centred(page, `Employee ID: ${d.employeeId}`, cx, top(71), f.reg, 6.4, INK);
-  centred(page, `Mobile: ${d.contact}`, cx, top(74.4), f.reg, 6.4, INK);
-  centred(page, `${d.company} | Blood Group: ${d.bloodGroup || "Not recorded"}`, cx, top(77.6), f.bold, 5.6, INK, W - mm(24));
+  // Details; the union designation line only appears when the admin has set one, so the rest moves up to make room.
+  const ud = d.unionDesignation?.trim();
+  if (ud) centred(page, ud, cx, top(70.2), f.bold, 7, RED, W - mm(6));
+  const [r1, r2, r3] = ud ? [73.2, 76, 78.5] : [71, 74.4, 77.6];
+  centred(page, `Employee ID: ${d.employeeId}`, cx, top(r1), f.reg, 6.4, INK);
+  centred(page, `Mobile: ${d.contact}`, cx, top(r2), f.reg, 6.4, INK);
+  centred(page, `${d.company} | Blood Group: ${d.bloodGroup || "Not recorded"}`, cx, top(r3), f.bold, 5.6, INK, W - mm(24));
 
   barcode(page, d.membershipNo, x + mm(20), top(83.4), mm(4.2), mm(28));
 }
