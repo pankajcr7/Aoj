@@ -11,7 +11,7 @@ export default async function RegisterPage() {
   const paymentId = RAZORPAY_ENABLED ? await paymentApplicationId() : null;
   return (
     <>
-      <SiteHeader actions={false} />
+      <SiteHeader currentPage="/register" />
       <main className="w-full flex-1 px-2 py-6 sm:px-4 lg:py-10">
         {paymentId && <p className="mx-auto mb-4 max-w-6xl text-sm"><Link href="/register/payment" className="font-semibold text-accent underline">View or complete your submitted application payment</Link></p>}
         <MembershipForm />

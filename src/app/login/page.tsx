@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <SiteHeader actions={false} />
+      <SiteHeader currentPage="/login" />
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-16">
         {forgot ? (
           <ForgotForm onBack={() => setForgot(false)} />

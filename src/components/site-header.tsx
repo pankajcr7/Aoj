@@ -32,59 +32,51 @@ const infoLinks = [
   ["Download Forms", "https://pspcl.in/download-forms.aspx"],
 ];
 
-export function SiteHeader({ actions = true, currentPage = "/" }: { actions?: boolean; currentPage?: string }) {
+export function SiteHeader({ currentPage = "/" }: { currentPage?: string }) {
   return (
-    <header className="sticky top-0 z-30 bg-canvas/90 backdrop-blur-md">
+    <header className="sticky top-0 z-30 bg-night/95 text-white backdrop-blur-md">
       <div className="mx-auto flex h-18 max-w-6xl items-center justify-between gap-6 px-4 sm:px-6">
         <Logo />
-        {actions && (
-          <nav aria-label="Main navigation" className="hidden items-center gap-6 text-[13px] text-muted lg:flex">
-            {links.map(([label, href]) => (
-              <Link key={href} href={href} aria-current={href === currentPage ? "page" : undefined} className={`whitespace-nowrap transition hover:text-ink ${href === currentPage ? "font-semibold text-ink" : ""}`}>
-                {label}
-              </Link>
-            ))}
-            <div className="group relative">
-              <button type="button" className="flex items-center gap-1 transition hover:text-ink group-focus-within:text-ink">
-                Information Center <CaretDown size={12} weight="bold" />
-              </button>
-              <div className="invisible absolute top-full left-1/2 -translate-x-1/2 pt-3 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-                <ul className="w-60 rounded-xl border border-line bg-canvas p-2 shadow-lg">
-                  {infoLinks.map(([label, href]) => (
-                    <li key={label}>
-                      <a href={href} target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-ink transition hover:bg-surface-2">
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </nav>
-        )}
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          {actions && (
-            <>
-              <Link href="/login" className="btn-outline hidden px-4 py-2 sm:inline-flex">
-                Log in
-              </Link>
-              <Link href="/register" className="btn-accent px-4 py-2">
-                Register
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-      {actions && (
-        <nav aria-label="Mobile navigation" className="mx-auto flex max-w-6xl gap-5 overflow-x-auto border-t border-line px-4 py-2 text-[13px] whitespace-nowrap text-muted sm:px-6 lg:hidden">
+        <nav aria-label="Main navigation" className="hidden items-center gap-6 text-[13px] text-white/70 lg:flex">
           {links.map(([label, href]) => (
-            <Link key={href} href={href} aria-current={href === currentPage ? "page" : undefined} className={`shrink-0 transition hover:text-ink ${href === currentPage ? "font-semibold text-ink" : ""}`}>
+            <Link key={href} href={href} aria-current={href === currentPage ? "page" : undefined} className={`whitespace-nowrap transition hover:text-white ${href === currentPage ? "font-semibold text-white" : ""}`}>
               {label}
             </Link>
           ))}
+          <div className="group relative">
+            <button type="button" className="flex items-center gap-1 transition hover:text-white group-focus-within:text-white">
+              Information Center <CaretDown size={12} weight="bold" />
+            </button>
+            <div className="invisible absolute top-full left-1/2 -translate-x-1/2 pt-3 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+              <ul className="w-60 rounded-xl border border-line bg-canvas p-2 shadow-lg">
+                {infoLinks.map(([label, href]) => (
+                  <li key={label}>
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-ink transition hover:bg-surface-2">
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </nav>
-      )}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link href="/login" className="btn hidden border border-white/30 px-4 py-2 text-white hover:bg-white/10 sm:inline-flex">
+            Log in
+          </Link>
+          <Link href="/register" className="btn-brand px-4 py-2">
+            Register
+          </Link>
+        </div>
+      </div>
+      <nav aria-label="Mobile navigation" className="mx-auto flex max-w-6xl gap-5 overflow-x-auto border-t border-white/10 px-4 py-2 text-[13px] whitespace-nowrap text-white/70 sm:px-6 lg:hidden">
+        {links.map(([label, href]) => (
+          <Link key={href} href={href} aria-current={href === currentPage ? "page" : undefined} className={`shrink-0 transition hover:text-white ${href === currentPage ? "font-semibold text-white" : ""}`}>
+            {label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }

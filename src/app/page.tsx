@@ -69,11 +69,11 @@ export default function Home() {
                 className="rise mt-4 font-display text-[2.6rem] leading-[1.12] font-semibold tracking-tight sm:text-[3.6rem]"
                 style={{ "--i": 1 } as React.CSSProperties}
               >
-                One Voice for Punjab&apos;s Power Junior Engineers
+                A United Voice for PSPCL &amp; PSTCL Junior Engineers
               </h1>
               <p className="rise mt-6 max-w-md text-[15px] text-muted" style={{ "--i": 2 } as React.CSSProperties}>
-                The Association of Junior Engineers, Punjab represents Junior Engineers of PSPCL and PSTCL. Apply for membership
-                online and receive your membership number and login after approval.
+                AOJE Punjab brings Junior Engineers together to represent their concerns, protect their interests, and advocate
+                for fair service conditions in PSPCL and PSTCL.
               </p>
               <div className="rise mt-9 flex flex-wrap gap-3" style={{ "--i": 3 } as React.CSSProperties}>
                 <Link href="/register" className="btn-accent px-6 py-3">

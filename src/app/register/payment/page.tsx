@@ -12,7 +12,7 @@ export default async function PaymentPage() {
   if (!applicationId) redirect("/register");
   const payment = await getPayment(applicationId, "registration");
   if (!payment) redirect("/register");
-  return <><SiteHeader actions={false} /><main className="mx-auto w-full max-w-xl flex-1 px-4 py-10">
+  return <><SiteHeader currentPage="/register/payment" /><main className="mx-auto w-full max-w-xl flex-1 px-4 py-10">
     <h1 className="text-2xl font-bold">Your application payment</h1>
     <p className="mt-2 text-sm text-muted">Reference: {refFor(applicationId)}. Your application is saved. Complete the payment so the Operation Team can approve it.</p>
     <RazorpayPayment applicationId={applicationId} purpose="registration" amount={payment.amount} membershipAmount={payment.membershipAmount}
