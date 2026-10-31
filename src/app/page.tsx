@@ -1,20 +1,7 @@
-import { Check, ListChecks, Phone, UsersThree } from "@phosphor-icons/react/ssr";
+import { Phone } from "@phosphor-icons/react/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import { Logo, SiteHeader } from "@/components/site-header";
-
-const membership = [
-  {
-    icon: UsersThree,
-    title: "Who Can Apply",
-    items: ["JE (Electrical), JE (Civil), JE (Mechanical) and AAE", "Serving in PSPCL or PSTCL", "Posted in any zone, circle or office", "ITI, Diploma, BE, B.Tech or M.Tech"],
-  },
-  {
-    icon: ListChecks,
-    title: "Keep Ready",
-    items: ["Employee ID number", "Dates of joining PSPCL/PSTCL and current post", "Zone, circle, division, sub-division", "A recent passport-size photo"],
-  },
-];
 
 // State Body Leadership (from the association's office-bearer list).
 const heads = [
@@ -116,38 +103,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Membership */}
-        <section id="membership" className="mx-auto max-w-6xl scroll-mt-32 px-4 py-16 sm:px-6 lg:scroll-mt-20">
-          <Heading
-            title="Membership Made Simple"
-            body="Who can apply and what to keep ready for your membership application."
-          />
-          <div className="mt-10 grid gap-6 lg:grid-cols-2">
-            {membership.map(({ icon: Icon, title, items }, n) => (
-              <article
-                key={title}
-                className="reveal rounded-2xl border border-line bg-surface p-8"
-                style={{ "--i": n } as React.CSSProperties}
-              >
-                <span className="slant grid h-11 w-[60px] place-items-center bg-night text-white">
-                  <Icon size={20} weight="bold" />
-                </span>
-                <h3 className="mt-6 font-display text-xl font-bold">{title}</h3>
-                <ul className="mt-4 space-y-3 text-sm text-muted">
-                  {items.map((t) => (
-                    <li key={t} className="flex gap-2.5">
-                      <Check size={16} weight="bold" className="mt-0.5 shrink-0 text-brand" /> {t}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted">
-            If the subscription is not paid for six consecutive months, membership may be ceased without notice.
-          </p>
-        </section>
-
         {/* State Body Leadership */}
         <section id="leadership" className="mx-auto max-w-6xl scroll-mt-32 px-4 py-24 sm:px-6 lg:scroll-mt-20">
           <Heading center title="State Body Leadership" body="The office-bearers of the Association of Junior Engineers, Punjab." />
@@ -204,7 +159,6 @@ export default function Home() {
             <ul className="mt-4 space-y-2.5 text-sm text-muted">
               <li><Link href="/register" className="hover:text-ink">Register</Link></li>
               <li><Link href="/login" className="hover:text-ink">Member Login</Link></li>
-              <li><Link href="/#membership" className="hover:text-ink">Membership</Link></li>
               <li><Link href="/#leadership" className="hover:text-ink">Leadership</Link></li>
             </ul>
           </div>

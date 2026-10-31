@@ -1,3 +1,4 @@
+import { CaretDown } from "@phosphor-icons/react/ssr";
 import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
@@ -15,11 +16,20 @@ export function Logo() {
 
 const links = [
   ["Home", "/"],
-  ["Membership", "/#membership"],
   ["Leadership", "/#leadership"],
   ["Contact", "/#contact"],
   ["News & Media", "/news-media"],
   ["About Us", "/about-us"],
+];
+
+const infoLinks = [
+  ["Regulations & Circulars", "https://pspcl.in/regulations-circulars.aspx"],
+  ["Commercial Circulars", "https://pspcl.in/commercial-circulars.aspx"],
+  ["Department Exam", "https://pspcl.in/department-exam.aspx"],
+  ["Right to Service Act", "https://pspcl.in/right-to-service-act.aspx"],
+  ["Seniority List", "https://docs.pspcl.in/vieworders.html"],
+  ["Public Notice", "https://pspcl.in/public-notice.aspx"],
+  ["Download Forms", "https://pspcl.in/download-forms.aspx"],
 ];
 
 export function SiteHeader({ actions = true, currentPage = "/" }: { actions?: boolean; currentPage?: string }) {
@@ -34,6 +44,22 @@ export function SiteHeader({ actions = true, currentPage = "/" }: { actions?: bo
                 {label}
               </Link>
             ))}
+            <div className="group relative">
+              <button type="button" className="flex items-center gap-1 transition hover:text-ink group-focus-within:text-ink">
+                Information Center <CaretDown size={12} weight="bold" />
+              </button>
+              <div className="invisible absolute top-full left-1/2 -translate-x-1/2 pt-3 opacity-0 transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                <ul className="w-60 rounded-xl border border-line bg-canvas p-2 shadow-lg">
+                  {infoLinks.map(([label, href]) => (
+                    <li key={label}>
+                      <a href={href} target="_blank" rel="noopener noreferrer" className="block rounded-lg px-3 py-2 text-ink transition hover:bg-surface-2">
+                        {label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </nav>
         )}
         <div className="flex items-center gap-2">
