@@ -182,25 +182,30 @@ function front(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: 
   centred(page, d.name, cx, top(55.6), f.bold, 13, NAVY);
   centred(page, d.designation, cx, top(59.2), f.bold, 7.2, INK);
 
-  // Membership number bar: red label tab (sized to its text) + navy band
-  const by = top(66), bh = mm(5.6), label = "Membership No :";
-  const tabEnd = mm(2.5) + f.bold.widthOfTextAtSize(label, 7) + mm(1);
-  page.drawRectangle({ x: x + tabEnd - mm(5), y: by, width: W - tabEnd + mm(5), height: bh, color: NAVY });
-  page.drawRectangle({ x, y: by, width: tabEnd, height: bh, color: RED });
-  page.drawCircle({ x: x + tabEnd, y: by + bh / 2, size: bh / 2, color: RED });
-  page.drawText(label, { x: x + mm(2.5), y: by + mm(1.9), size: 7, font: f.bold, color: WHITE });
-  const nx = tabEnd + bh / 2 + mm(2.5);
-  text(page, d.membershipNo, x + nx, by + mm(1.6), f.bold, 9.5, WHITE, W - nx - mm(2));
-
-  // Details; the union designation line only appears when the admin has set one, so the rest moves up to make room.
+  // Strips: red label tab + navy band. The union designation strip only appears when the admin has set one;
+  // then both tabs share one width so the values line up, and the details below tighten to make room.
   const ud = d.unionDesignation?.trim();
-  if (ud) centred(page, ud, cx, top(70.2), f.bold, 7, RED, W - mm(6));
-  const [r1, r2, r3] = ud ? [73.2, 76, 78.5] : [71, 74.4, 77.6];
-  centred(page, `Employee ID: ${d.employeeId}`, cx, top(r1), f.reg, 6.4, INK);
-  centred(page, `Mobile: ${d.contact}`, cx, top(r2), f.reg, 6.4, INK);
-  centred(page, `${d.company} | Blood Group: ${d.bloodGroup || "Not recorded"}`, cx, top(r3), f.bold, 5.6, INK, W - mm(24));
+  const labels = ud ? ["Membership No :", "Union Designation :"] : ["Membership No :"];
+  const tabEnd = mm(2.5) + Math.max(...labels.map((l) => f.bold.widthOfTextAtSize(l, 7))) + mm(1);
+  const strip = (label: string, value: string, bottom: number, bh: number, size: number) => {
+    const by = top(bottom);
+    page.drawRectangle({ x: x + tabEnd - mm(5), y: by, width: W - tabEnd + mm(5), height: bh, color: NAVY });
+    page.drawRectangle({ x, y: by, width: tabEnd, height: bh, color: RED });
+    page.drawCircle({ x: x + tabEnd, y: by + bh / 2, size: bh / 2, color: RED });
+    page.drawText(label, { x: x + mm(2.5), y: by + bh / 2 - mm(0.9), size: 7, font: f.bold, color: WHITE });
+    const nx = tabEnd + bh / 2 + mm(2.5);
+    text(page, value, x + nx, by + bh / 2 - mm(1.2), f.bold, size, WHITE, W - nx - mm(2));
+  };
+  strip(labels[0], d.membershipNo, 66, mm(5.6), 9.5);
+  if (ud) strip(labels[1], ud, 71.4, mm(4.8), 8);
 
-  barcode(page, d.membershipNo, x + mm(20), top(83.4), mm(4.2), mm(28));
+  // Details
+  const [r1, r2, r3, barH] = ud ? [74.3, 76.8, 79, 3.4] : [71, 74.4, 77.6, 4.2];
+  centred(page, `Employee ID: ${d.employeeId}`, cx, top(r1), f.reg, ud ? 6 : 6.4, INK);
+  centred(page, `Mobile: ${d.contact}`, cx, top(r2), f.reg, ud ? 6 : 6.4, INK);
+  centred(page, `${d.company} | Blood Group: ${d.bloodGroup || "Not recorded"}`, cx, top(r3), f.bold, ud ? 5.2 : 5.6, INK, W - mm(24));
+
+  barcode(page, d.membershipNo, x + mm(20), top(83.4), mm(barH), mm(28));
 }
 
 function back(page: PDFPage, x: number, y: number, d: CardData, f: Fonts, img: Images) {

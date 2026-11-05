@@ -33,22 +33,24 @@ const refresh = () => revalidatePath("/dashboard", "layout");
 const isUnique = (e: unknown) =>
   (e as { code?: string }).code === "23505" || (e as { cause?: { code?: string } }).cause?.code === "23505";
 
-/** Approve a pending application: issue membership number + member login in one atomic statement. */
-export async function approveApplication(applicationId: string, confirmUnpaid = false): Promise<Credentials> {
+/** Approve a pending application with the membership number staff typed in; creates the member login in one atomic statement. */
+export async function approveApplication(applicationId: string, number: string, confirmUnpaid = false): Promise<Credentials> {
   const reviewer = await requireRole(STAFF);
+  const digits = String(number ?? "").trim().replace(/^AOJE-?/i, "");
+  if (!/^[1-9]\d{0,5}$/.test(digits)) return { error: "Enter the membership number, e.g. 930." };
+  const n = Number(digits);
   const [charge] = RAZORPAY_ENABLED
     ? await db.select({ status: payments.status }).from(payments).where(and(eq(payments.applicationId, applicationId), eq(payments.purpose, "registration")))
     : [];
   const unpaidConfirmed = !RAZORPAY_ENABLED || confirmUnpaid === true;
   if (charge && charge.status !== "paid" && !unpaidConfirmed)
     return { paymentConfirmationRequired: true, error: "Payment is not received. Are you sure you want to accept the application?" };
-  const { rows } = await db.execute<{ n: number }>(sql`select nextval('membership_seq')::int as n`);
-  const n = rows[0].n;
   const password = generatePassword();
   const loginId = memberLoginId(n);
   const hash = await bcrypt.hash(password, 12);
 
   // One statement = atomic: the user is only created if the application was still pending.
+  // A number already in use fails the unique constraints on membership_no / login_id, so nothing is written.
   const created = await db.execute(sql`
     with upd as (
       update applications
@@ -59,7 +61,11 @@ export async function approveApplication(applicationId: string, confirmUnpaid = 
     )
     insert into users (login_id, password_hash, application_id)
     select ${loginId}, ${hash}, id from upd
-    returning id`);
+    returning id`).catch((e) => {
+    if (isUnique(e)) return null;
+    throw e;
+  });
+  if (!created) return { error: `Membership number ${membershipNo(n)} is already given to another member.` };
 
   if (!created.rows.length) {
     const [current] = await db.select({ status: applications.status }).from(applications).where(eq(applications.id, applicationId));

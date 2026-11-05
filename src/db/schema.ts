@@ -6,7 +6,6 @@ import {
   date,
   integer,
   pgEnum,
-  pgSequence,
   pgTable,
   text,
   timestamp,
@@ -16,8 +15,7 @@ import {
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
-// Membership numbers: AOJE-930, AOJE-931, ... (issued in order on approval)
-export const membershipSeq = pgSequence("membership_seq", { startWith: 930 });
+// Membership numbers (AOJE-930 etc.) are typed in by staff on approval; see approveApplication.
 
 export const role = pgEnum("role", ["admin", "operations", "member"]);
 export const status = pgEnum("application_status", ["pending", "approved", "rejected", "suspended", "terminated"]);

@@ -223,14 +223,13 @@ async function main() {
   assert.equal(applicationSchema.applicationSchema.parse({ ...base, correspondingAddress: undefined }).correspondingAddress, null, "Legacy corrections can leave the new field blank");
 
   function approvalHarness(paymentStatus, reviewed = false, paymentChanged = false, enabled = true) {
-    const state = { sequenceCalls: 0, approvalCalls: 0, notifications: 0, paymentStatus, paymentReads: 0 };
+    const state = { approvalCalls: 0, notifications: 0, paymentStatus, paymentReads: 0 };
     const db = {
       select: () => ({ from: table => ({ where: async () => {
         if (table === tables.payments) { state.paymentReads++; return paymentStatus == null ? [] : [{ status: paymentStatus }]; }
         return [{ id: appId, name: "Test Member", email: "test@example.com", contact: "9876543210", status: reviewed ? "approved" : "pending" }];
       } }) }),
       execute: async query => {
-        if (query.strings.join("").includes("nextval")) { state.sequenceCalls++; return { rows: [{ n: 1001 }] }; }
         state.approvalCalls++;
         assert.ok(query.strings.join("").includes("status = 'pending'"), "Approval remains guarded against duplicate review");
         assert.ok(query.strings.join("").includes("not exists"), "Payment changes are checked atomically");
@@ -247,22 +246,28 @@ async function main() {
   }
   for (const status of ["pending", "created", "authorized", "failed", "refunded", "partially_refunded"]) {
     const h = approvalHarness(status);
-    const result = await h.actions.approveApplication(appId);
+    const result = await h.actions.approveApplication(appId, "930");
     assert.equal(result.paymentConfirmationRequired, true);
     assert.equal(result.error, "Payment is not received. Are you sure you want to accept the application?");
-    assert.equal(h.state.sequenceCalls, 0); assert.equal(h.state.notifications, 0);
-    assert.equal((await h.actions.approveApplication(appId, "yes")).paymentConfirmationRequired, true, "Only an explicit boolean confirmation permits unpaid approval");
-    const confirmed = await h.actions.approveApplication(appId, true);
-    assert.equal(confirmed.membershipNo, "AOJE-1001"); assert.ok(confirmed.password);
+    assert.equal(h.state.approvalCalls, 0); assert.equal(h.state.notifications, 0);
+    assert.equal((await h.actions.approveApplication(appId, "930", "yes")).paymentConfirmationRequired, true, "Only an explicit boolean confirmation permits unpaid approval");
+    const confirmed = await h.actions.approveApplication(appId, "930", true);
+    assert.equal(confirmed.membershipNo, "AOJE-930"); assert.equal(confirmed.loginId, "aoj930"); assert.ok(confirmed.password);
     assert.equal(h.state.approvalCalls, 1); assert.equal(h.state.notifications, 1);
     assert.equal(h.state.paymentStatus, status, "Approval leaves payment status unchanged");
   }
-  for (const status of ["paid", null]) assert.ok((await approvalHarness(status).actions.approveApplication(appId)).password);
+  for (const status of ["paid", null]) assert.ok((await approvalHarness(status).actions.approveApplication(appId, "930")).password);
+  for (const bad of ["", "0", "abc", "1234567", "-5"]) {
+    const h = approvalHarness("paid");
+    assert.match((await h.actions.approveApplication(appId, bad)).error, /Enter the membership number/);
+    assert.equal(h.state.approvalCalls, 0, "Invalid numbers write nothing");
+  }
+  assert.equal((await approvalHarness("paid").actions.approveApplication(appId, "AOJE-931")).membershipNo, "AOJE-931", "A pasted full number is accepted");
   const duplicate = approvalHarness("pending", true);
-  assert.equal((await duplicate.actions.approveApplication(appId, true)).error, "This application was already reviewed.");
+  assert.equal((await duplicate.actions.approveApplication(appId, "930", true)).error, "This application was already reviewed.");
   assert.equal(duplicate.state.notifications, 0);
   const changed = approvalHarness("paid", false, true);
-  assert.equal((await changed.actions.approveApplication(appId)).paymentConfirmationRequired, true);
+  assert.equal((await changed.actions.approveApplication(appId, "930")).paymentConfirmationRequired, true);
   assert.equal(changed.state.notifications, 0);
   // Paused mode saves only the application and approves unpaid applications directly.
   const pausedAction = load("src/app/register/actions.ts", { ...registrationImports, "@/lib/payment-rules": disabledRules });
@@ -275,7 +280,7 @@ async function main() {
   assert.equal(batch[0].values.pvcCardRequested, true); assert.equal(grants, 12);
   for (const status of ["pending", "authorized", "failed", "refunded", "paid", null]) {
     const h = approvalHarness(status, false, false, false);
-    assert.ok((await h.actions.approveApplication(appId)).password);
+    assert.ok((await h.actions.approveApplication(appId, "930")).password);
     assert.equal(h.state.paymentReads, 0); assert.equal(h.state.paymentStatus, status);
   }
   for (const name of ["order", "status", "verify", "webhook"]) {

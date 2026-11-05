@@ -86,8 +86,9 @@ export function SecretBox({ title, creds }: { title: string; creds: Credentials 
 }
 
 export function ReviewPanel({ applicationId, pending, paymentNotReceived }: { applicationId: string; pending: boolean; paymentNotReceived: boolean }) {
+  const [number, setNumber] = useState(""); // controlled, so it survives the form reset after an error
   const [approved, approve, approving] = useActionState(
-    (_: Credentials, formData: FormData) => approveApplication(applicationId, formData.get("confirmUnpaid") === "yes"),
+    (_: Credentials, formData: FormData) => approveApplication(applicationId, number, formData.get("confirmUnpaid") === "yes"),
     {} as Credentials,
   );
   const [rejected, reject, rejecting] = useActionState(rejectApplication.bind(null, applicationId), {} as Result);
@@ -125,8 +126,25 @@ export function ReviewPanel({ applicationId, pending, paymentNotReceived }: { ap
       {mode === "approve" ? (
         <form action={approve} className="space-y-3">
           <p className="text-sm text-muted">
-            Approving issues a membership number and creates the member&apos;s login. Check the details and photo first.
+            Approving issues the membership number below and creates the member&apos;s login. Check the details and photo first.
           </p>
+          <label htmlFor="membershipNumber" className="block text-sm font-medium">
+            Membership number
+          </label>
+          <div className="flex items-center rounded-lg border border-line focus-within:border-ink">
+            <span className="pl-3.5 text-[15px] font-semibold text-muted">AOJE-</span>
+            <input
+              id="membershipNumber"
+              value={number}
+              onChange={(e) => setNumber(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              inputMode="numeric"
+              required
+              placeholder="930"
+              autoComplete="off"
+              className="w-full bg-transparent py-2.5 pr-3.5 pl-1 text-[15px] outline-none"
+            />
+          </div>
+          <p className="text-xs text-muted">The member&apos;s login ID will be aoj{number || "930"}.</p>
           {confirming ? (
             <div className="space-y-3">
               {needsPaymentConfirmation && (
@@ -145,7 +163,7 @@ export function ReviewPanel({ applicationId, pending, paymentNotReceived }: { ap
               </div>
             </div>
           ) : (
-            <button type="button" onClick={() => setConfirming(true)} className="btn-accent w-full py-3">
+            <button type="button" disabled={!number} onClick={() => setConfirming(true)} className="btn-accent w-full py-3">
               <CheckCircle size={18} weight="bold" /> Approve Application
             </button>
           )}
